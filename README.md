@@ -9,7 +9,7 @@ It is a **research tool you run on your own computer**, not a hosted website. Yo
 You need [Node.js 24+](https://nodejs.org/).
 
 ```sh
-git clone <this repo> gbg-osint
+git clone https://github.com/vivekvivian1294/gbg-osint.git
 cd gbg-osint
 npm install
 npm start
