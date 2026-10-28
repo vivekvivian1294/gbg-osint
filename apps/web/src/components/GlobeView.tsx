@@ -1,0 +1,405 @@
+import type { ClientConfig, Feature, Frame } from '@gbg-osint/shared';
+import {
+  Cartographic,
+  Math as CesiumMath,
+  ScreenSpaceEventHandler,
+  ScreenSpaceEventType,
+  type CesiumWidget,
+} from 'cesium';
+import { useEffect, useImperativeHandle, useRef, type Ref } from 'react';
+import type { BasemapId, StyleId } from '../config';
+import { BuildingLayer } from '../engine/buildings';
+import type { CameraState } from '../engine/cameraState';
+import { DistrictLayer } from '../engine/districts';
+import { createGlobe, getCameraState, setBasemap, setCameraState } from '../engine/globe';
+import type { MarkerSpec, PickRef } from '../engine/markerSpec';
+import { MarkerRenderer } from '../engine/markers';
+import { Overlay, type OverlayStats } from '../engine/overlay';
+import { RadarLayer, type RadarState } from '../engine/radar';
+import { StyleController } from '../engine/styles';
+import { ToolLayer, type Drawing } from '../engine/tools';
+import { TourPlayer, type Tour, type TourState } from '../engine/tours';
+import { CameraTracker } from '../engine/tracker';
+import { TrafficLayer } from '../engine/traffic';
+import { ViewshedLayer, type ViewCamera } from '../engine/viewsheds';
+import { WaterwayLayer } from '../engine/waterways';
+import type { TrackRef } from '../layers/contacts';
+import type { DistrictShape } from '../layers/districts';
+import type { Store } from '../state/store';
+
+export interface GlobeHandle {
+  flyTo(camera: CameraState): void;
+  playTour(tour: Tour): void;
+  stopTour(): void;
+  radarPlay(playing: boolean): void;
+  radarSeek(index: number): void;
+}
+
+/** Line features of one active layer; `version` changes whenever the features do. */
+export interface FeatureSet {
+  layerId: string;
+  channel: string;
+  version: number;
+  features: readonly Feature[];
+}
+
+export interface RadarFrames {
+  version: number;
+  frames: readonly Frame[];
+}
+
+export interface CameraViews {
+  version: number;
+  cameras: readonly ViewCamera[];
+}
+
+/** Coloured district polygons; `key` changes with the data or the chosen statistic. */
+export interface DistrictFill {
+  key: string;
+  layerId: string;
+  channel: string;
+  shapes: readonly DistrictShape[];
+}
+
+/** Overlay colour that stays legible on top of each sensor style. */
+const OVERLAY_COLORS: Record<StyleId, string> = {
+  normal: '#5eead4',
+  crt: '#9effc4',
+  nvg: '#8cff9e',
+  flir: '#ffffff',
+  ironbow: '#ffd166',
+  noir: '#f5f5f5',
+};
+
+const STATS_INTERVAL_MS = 500;
+const BUILDING_REFRESH_MS = 1_000;
+
+interface GlobeViewProps {
+  ref?: Ref<GlobeHandle>;
+  basemap: BasemapId;
+  basemapKeys: ClientConfig;
+  style: StyleId;
+  detection: boolean;
+  density: number;
+  tracked: TrackRef | null;
+  initialCamera: CameraState;
+  markers: readonly MarkerSpec[];
+  waterways: FeatureSet | null;
+  traffic: FeatureSet | null;
+  radar: RadarFrames | null;
+  buildings: boolean;
+  cameraViews: CameraViews | null;
+  districts: DistrictFill | null;
+  drawing: Drawing;
+  /** While a map tool is active, clicks place points instead of selecting objects. */
+  toolActive: boolean;
+  ride: boolean;
+  cameraStore: Store<CameraState>;
+  statsStore: Store<OverlayStats>;
+  radarStore: Store<RadarState>;
+  tourStore: Store<TourState | null>;
+  onCameraSettled(state: CameraState): void;
+  onPick(pick: PickRef | null): void;
+  onMapClick(lon: number, lat: number): void;
+  onTrackLost(): void;
+}
+
+interface Engine {
+  globe: CesiumWidget;
+  renderer: MarkerRenderer;
+  styles: StyleController;
+  overlay: Overlay;
+  tracker: CameraTracker;
+  waterways: WaterwayLayer;
+  traffic: TrafficLayer;
+  radar: RadarLayer;
+  buildings: BuildingLayer;
+  viewsheds: ViewshedLayer;
+  tours: TourPlayer;
+  districts: DistrictLayer;
+  tools: ToolLayer;
+}
+
+const featureKey = (set: FeatureSet | null) => (set ? `${set.channel}:${set.version}` : 'off');
+
+export function GlobeView(props: GlobeViewProps) {
+  const { ref, basemap, style, detection, density, tracked, markers, buildings, ride, drawing } =
+    props;
+  const waterwaysKey = featureKey(props.waterways);
+  const trafficKey = featureKey(props.traffic);
+  const radarKey = props.radar ? props.radar.version : 'off';
+  const viewsKey = props.cameraViews ? props.cameraViews.version : 'off';
+  const districtsKey = props.districts ? props.districts.key : 'off';
+  const containerRef = useRef<HTMLDivElement>(null);
+  const creditsRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<Engine | null>(null);
+  const initial = useRef({ basemap, camera: props.initialCamera });
+  const currentBasemap = useRef(basemap);
+  const latest = useRef(props);
+
+  useEffect(() => {
+    latest.current = props;
+  });
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const credits = creditsRef.current;
+    const canvas = overlayRef.current;
+    if (!container || !credits || !canvas) return;
+    const globe = createGlobe(
+      container,
+      credits,
+      initial.current.basemap,
+      latest.current.basemapKeys,
+    );
+    currentBasemap.current = initial.current.basemap;
+    setCameraState(globe, initial.current.camera);
+    const renderer = new MarkerRenderer(globe.scene);
+    const engine: Engine = {
+      globe,
+      renderer,
+      styles: new StyleController(globe.scene),
+      overlay: new Overlay(canvas, globe.scene, renderer),
+      tracker: new CameraTracker(globe.scene, renderer),
+      waterways: new WaterwayLayer(globe.scene),
+      traffic: new TrafficLayer(globe.scene),
+      radar: new RadarLayer(globe, (state) => latest.current.radarStore.set(state)),
+      buildings: new BuildingLayer(globe.scene, globe.creditDisplay),
+      viewsheds: new ViewshedLayer(globe.scene),
+      tours: new TourPlayer((state) => latest.current.tourStore.set(state)),
+      districts: new DistrictLayer(globe.scene),
+      tools: new ToolLayer(globe.scene),
+    };
+    engineRef.current = engine;
+
+    const { camera, scene } = globe;
+    camera.percentageChanged = 0.001;
+    let lastStats = 0;
+    let lastBuildingRefresh = 0;
+    const removers = [
+      camera.changed.addEventListener(() => latest.current.cameraStore.set(getCameraState(globe))),
+      camera.moveEnd.addEventListener(() => {
+        latest.current.onCameraSettled(getCameraState(globe));
+        engine.viewsheds.update();
+      }),
+      scene.postRender.addEventListener(() => {
+        const stats = engine.overlay.draw();
+        const now = performance.now();
+        if (now - lastStats >= STATS_INTERVAL_MS) {
+          lastStats = now;
+          latest.current.statsStore.set(stats);
+        }
+      }),
+    ];
+
+    const handler = new ScreenSpaceEventHandler(scene.canvas);
+    handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
+      if (latest.current.toolActive) {
+        const ground = camera.pickEllipsoid(e.position);
+        if (!ground) return;
+        const c = Cartographic.fromCartesian(ground);
+        latest.current.onMapClick(
+          CesiumMath.toDegrees(c.longitude),
+          CesiumMath.toDegrees(c.latitude),
+        );
+        return;
+      }
+      const picked: unknown = scene.pick(e.position);
+      latest.current.onPick(renderer.resolvePick(picked) ?? engine.traffic.pickOf(picked) ?? null);
+    }, ScreenSpaceEventType.LEFT_CLICK);
+    // Any drag or zoom hands the camera back to the user.
+    const stopTour = () => engine.tours.stop();
+    scene.canvas.addEventListener('pointerdown', stopTour);
+    scene.canvas.addEventListener('wheel', stopTour, { passive: true });
+
+    let frame = requestAnimationFrame(function loop() {
+      const now = performance.now();
+      const tourCamera = engine.tours.frame(now);
+      if (tourCamera) setCameraState(globe, tourCamera);
+      const moved = renderer.tick(now);
+      const flowing = engine.waterways.update(now);
+      const driving = engine.traffic.update(now);
+      const raining = engine.radar.update(now);
+      if (now - lastBuildingRefresh >= BUILDING_REFRESH_MS) {
+        lastBuildingRefresh = now;
+        engine.buildings.refresh();
+      }
+      const building = engine.buildings.update();
+      const districting = engine.districts.update();
+      const tracking = engine.tracker.update();
+      if (tracking === 'lost') latest.current.onTrackLost();
+      if (
+        moved ||
+        flowing ||
+        driving ||
+        raining ||
+        building ||
+        districting ||
+        tourCamera ||
+        tracking === 'following' ||
+        engine.styles.animated
+      ) {
+        scene.requestRender();
+      }
+      frame = requestAnimationFrame(loop);
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      handler.destroy();
+      scene.canvas.removeEventListener('pointerdown', stopTour);
+      scene.canvas.removeEventListener('wheel', stopTour);
+      for (const remove of removers) remove();
+      engine.tours.stop();
+      engine.tracker.stop();
+      engine.styles.destroy();
+      engine.waterways.clear();
+      engine.traffic.destroy();
+      engine.radar.clear();
+      engine.buildings.destroy();
+      engine.viewsheds.clear();
+      engine.districts.clear();
+      engine.tools.destroy();
+      renderer.destroy();
+      globe.destroy();
+      engineRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    engineRef.current?.renderer.sync(markers);
+  }, [markers]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const set = latest.current.waterways;
+    if (set) engine.waterways.set(set.features);
+    else engine.waterways.clear();
+  }, [waterwaysKey]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const set = latest.current.traffic;
+    if (set) engine.traffic.set(set.layerId, set.channel, set.features);
+    else engine.traffic.clear();
+  }, [trafficKey]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const radar = latest.current.radar;
+    if (radar) engine.radar.set(radar.frames);
+    else engine.radar.clear();
+  }, [radarKey]);
+
+  useEffect(() => {
+    engineRef.current?.buildings.setEnabled(buildings);
+  }, [buildings]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const views = latest.current.cameraViews;
+    if (views) engine.viewsheds.set(views.cameras);
+    else engine.viewsheds.clear();
+    engine.globe.scene.requestRender();
+  }, [viewsKey]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const fill = latest.current.districts;
+    if (!fill) {
+      engine.districts.clear();
+      return;
+    }
+    const { layerId, channel } = fill;
+    engine.districts.set(fill.key, fill.shapes, (id) => ({ layerId, channel, ids: [id] }));
+  }, [districtsKey]);
+
+  useEffect(() => {
+    engineRef.current?.tools.set(drawing);
+  }, [drawing]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine || currentBasemap.current === basemap) return;
+    currentBasemap.current = basemap;
+    setBasemap(engine.globe, basemap, latest.current.basemapKeys);
+  }, [basemap]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.styles.set(style);
+    engine.overlay.options = {
+      ...engine.overlay.options,
+      detection,
+      density,
+      color: OVERLAY_COLORS[style],
+    };
+    engine.globe.scene.requestRender();
+  }, [style, detection, density]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const { renderer, tracker, overlay } = engine;
+    if (!tracked) {
+      tracker.stop();
+      overlay.options = { ...overlay.options, trackedKey: null };
+      return;
+    }
+    const key = renderer.findKey(tracked.layerId, tracked.id);
+    if (!key || key === tracker.trackedKey) return;
+    engine.tours.stop();
+    if (tracker.start(key, renderer.specOf(key)?.trackRange ?? 2_000)) {
+      overlay.options = { ...overlay.options, trackedKey: key };
+    }
+  }, [tracked, markers]);
+
+  useEffect(() => {
+    engineRef.current?.tracker.setView(ride && tracked ? 'cab' : 'chase');
+  }, [ride, tracked]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      flyTo(camera) {
+        const engine = engineRef.current;
+        if (!engine) return;
+        engine.tours.stop();
+        engine.tracker.stop();
+        setCameraState(engine.globe, camera, true);
+      },
+      playTour(tour) {
+        const engine = engineRef.current;
+        if (!engine) return;
+        engine.tracker.stop();
+        engine.globe.camera.cancelFlight();
+        engine.tours.play(tour, performance.now());
+      },
+      stopTour() {
+        engineRef.current?.tours.stop();
+      },
+      radarPlay(playing) {
+        engineRef.current?.radar.play(playing);
+      },
+      radarSeek(index) {
+        engineRef.current?.radar.seek(index);
+      },
+    }),
+    [],
+  );
+
+  return (
+    <>
+      <div ref={containerRef} className="globe" />
+      <canvas ref={overlayRef} className="globe-overlay" aria-hidden="true" />
+      <div ref={creditsRef} className="globe-credits" />
+    </>
+  );
+}

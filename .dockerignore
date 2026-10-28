@@ -1,0 +1,9 @@
+.git/
+**/node_modules/
+**/dist/
+**/coverage/
+apps/web/public/cesium/
+.env
+.env.*
+!.env.example
+*.log

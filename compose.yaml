@@ -1,0 +1,18 @@
+# Runs the whole tool in one container: open http://localhost:8787
+services:
+  osint:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Listen inside the container; the port below is only published on this computer.
+      HOST: 0.0.0.0
+    ports:
+      - '127.0.0.1:8787:8787'
+    volumes:
+      - cache:/cache
+    restart: unless-stopped
+
+volumes:
+  cache:
