@@ -18,12 +18,15 @@ import type { MarkerSpec, PickRef } from '../engine/markerSpec';
 import { MarkerRenderer } from '../engine/markers';
 import { Overlay, type OverlayStats } from '../engine/overlay';
 import { RadarLayer, type RadarState } from '../engine/radar';
+import { SatelliteLayer } from '../engine/satellite';
 import { StyleController } from '../engine/styles';
 import { ToolLayer, type Drawing } from '../engine/tools';
 import { TourPlayer, type Tour, type TourState } from '../engine/tours';
 import { CameraTracker } from '../engine/tracker';
 import { TrafficLayer } from '../engine/traffic';
 import { TravelTimeLayer } from '../engine/travelTimes';
+import { WindLayer } from '../engine/wind';
+import type { WindField } from '../layers/wind';
 import { ViewshedLayer, type ViewCamera } from '../engine/viewsheds';
 import { WaterwayLayer } from '../engine/waterways';
 import type { TrackRef } from '../layers/contacts';
@@ -88,6 +91,11 @@ function groundAt(globe: CesiumWidget, position: Cartesian2): LonLat | null {
   return [CesiumMath.toDegrees(c.longitude), CesiumMath.toDegrees(c.latitude)];
 }
 
+function viewCentre(globe: CesiumWidget): LonLat | null {
+  const canvas = globe.scene.canvas;
+  return groundAt(globe, new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
+}
+
 interface GlobeViewProps {
   ref?: Ref<GlobeHandle>;
   basemap: BasemapId;
@@ -103,6 +111,9 @@ interface GlobeViewProps {
   travelTimes: FeatureSet | null;
   /** 24-hour path of the selected or tracked ship, aircraft or train. */
   trail: Track | null;
+  wind: WindField | null;
+  /** Yesterday's satellite image over the basemap. */
+  satellite: boolean;
   radar: RadarFrames | null;
   buildings: boolean;
   cameraViews: CameraViews | null;
@@ -116,6 +127,8 @@ interface GlobeViewProps {
   radarStore: Store<RadarState>;
   tourStore: Store<TourState | null>;
   onCameraSettled(state: CameraState): void;
+  /** The ground point at the centre of the view once the camera stops (null over the sky). */
+  onCentreSettled(point: LonLat | null): void;
   onPick(pick: PickRef | null): void;
   onMapClick(lon: number, lat: number): void;
   /** Right-click, or a long press on touch screens: "What's here?". */
@@ -133,6 +146,8 @@ interface Engine {
   traffic: TrafficLayer;
   travelTimes: TravelTimeLayer;
   trail: HistoryTrailLayer;
+  wind: WindLayer;
+  satellite: SatelliteLayer;
   radar: RadarLayer;
   buildings: BuildingLayer;
   viewsheds: ViewshedLayer;
@@ -158,6 +173,7 @@ export function GlobeView(props: GlobeViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const creditsRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const windRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const initial = useRef({ basemap, camera: props.initialCamera });
   const currentBasemap = useRef(basemap);
@@ -171,7 +187,8 @@ export function GlobeView(props: GlobeViewProps) {
     const container = containerRef.current;
     const credits = creditsRef.current;
     const canvas = overlayRef.current;
-    if (!container || !credits || !canvas) return;
+    const windCanvas = windRef.current;
+    if (!container || !credits || !canvas || !windCanvas) return;
     const globe = createGlobe(
       container,
       credits,
@@ -191,6 +208,8 @@ export function GlobeView(props: GlobeViewProps) {
       traffic: new TrafficLayer(globe.scene),
       travelTimes: new TravelTimeLayer(globe.scene),
       trail: new HistoryTrailLayer(globe.scene),
+      wind: new WindLayer(windCanvas, globe.scene),
+      satellite: new SatelliteLayer(globe),
       radar: new RadarLayer(globe, (state) => latest.current.radarStore.set(state)),
       buildings: new BuildingLayer(globe.scene, globe.creditDisplay),
       viewsheds: new ViewshedLayer(globe.scene),
@@ -199,6 +218,7 @@ export function GlobeView(props: GlobeViewProps) {
       tools: new ToolLayer(globe.scene),
     };
     engineRef.current = engine;
+    latest.current.onCentreSettled(viewCentre(globe));
 
     const { camera, scene } = globe;
     camera.percentageChanged = 0.001;
@@ -208,6 +228,7 @@ export function GlobeView(props: GlobeViewProps) {
       camera.changed.addEventListener(() => latest.current.cameraStore.set(getCameraState(globe))),
       camera.moveEnd.addEventListener(() => {
         latest.current.onCameraSettled(getCameraState(globe));
+        latest.current.onCentreSettled(viewCentre(globe));
         engine.viewsheds.update();
       }),
       scene.postRender.addEventListener(() => {
@@ -285,6 +306,7 @@ export function GlobeView(props: GlobeViewProps) {
       }
       const building = engine.buildings.update();
       const districting = engine.districts.update();
+      engine.wind.update(now);
       const tracking = engine.tracker.update();
       if (tracking === 'lost') latest.current.onTrackLost();
       if (
@@ -322,6 +344,8 @@ export function GlobeView(props: GlobeViewProps) {
       engine.traffic.destroy();
       engine.travelTimes.destroy();
       engine.trail.destroy();
+      engine.wind.set(null);
+      engine.satellite.hide();
       engine.radar.clear();
       engine.buildings.destroy();
       engine.viewsheds.clear();
@@ -368,6 +392,16 @@ export function GlobeView(props: GlobeViewProps) {
     if (trail) engine.trail.set(trail);
     else engine.trail.clear();
   }, [trailKey]);
+
+  useEffect(() => {
+    engineRef.current?.wind.set(props.wind);
+  }, [props.wind]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (props.satellite) engine?.satellite.show();
+    else engine?.satellite.hide();
+  }, [props.satellite]);
 
   useEffect(() => {
     const engine = engineRef.current;
@@ -475,12 +509,7 @@ export function GlobeView(props: GlobeViewProps) {
       },
       centre() {
         const engine = engineRef.current;
-        if (!engine) return null;
-        const canvas = engine.globe.scene.canvas;
-        return groundAt(
-          engine.globe,
-          new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
-        );
+        return engine ? viewCentre(engine.globe) : null;
       },
     }),
     [],
@@ -489,6 +518,7 @@ export function GlobeView(props: GlobeViewProps) {
   return (
     <>
       <div ref={containerRef} className="globe" />
+      <canvas ref={windRef} className="globe-overlay" aria-hidden="true" />
       <canvas ref={overlayRef} className="globe-overlay" aria-hidden="true" />
       <div ref={creditsRef} className="globe-credits" />
     </>

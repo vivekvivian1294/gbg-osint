@@ -430,15 +430,16 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Routing upgrade:** map-matching routes are now direction-aware: no sharp turns or reversals on rails (a train can't back through a switch), a U-turn penalty on roads and a penalty for setting off against the heading. This removed the zig-zag paths through station crossovers.
 - Still open: airport weather in the ride-along view.
 
-**6.2 Harbour, sea and weather** (harbour picture ✅ done; the rest open)
+**6.2 Harbour, sea and weather** ✅ done
 - ✅ **Sjöfartsverket ViVa:** 15 stations from Vinga and Marstrand to the river at Älvängen, polled every 3 minutes (HTTPS; the documented port 8080 times out). Markers show wind with gusts (coloured from fresh breeze to storm) or water level; the card adds wind direction, surface current, visibility, water and air temperature and pressure. ViVa gives Swedish local time without a zone, converted to UTC (summer and winter time).
 - ✅ **Ships expected at Gothenburg:** AIS now covers the Kattegat approach (56.6–58.6° N, 10.4–12.3° E; about 2 messages/s). A board lists ships whose crew-entered destination is Gothenburg (`SEGOT`, `GOTEBORG`, `GOTHENBORG`, `DKFDH<>SEGOT`, `FROM>GOTEBORG`, …) by reported ETA, with type, length, distance to the harbour entrance and speed or status. Leisure craft and moored ships are left out; ETAs more than 6 hours past are treated as stale. The ◎ button tracks the ship. Destinations and ETAs arrive every few minutes, so the board fills up after start.
 - ✅ **Rain nowcast** (MET Norway `nowcast`): metric chips "Rain now", "Rain in / Dry in N min" (or "Dry for at least") and the heaviest rate in the next 2 hours for the city centre, shown only with radar coverage.
-- The *Harbour watch* and *Storm watch* missions include the new layers.
-- **Animated wind** (Open-Meteo multi-point grid ✓; MET Norway as an alternative) *(GEV)*: flowing particles with a reading at the map centre.
-- **Crowd-sourced air quality** (Sensor.Community ✓, about 25 sensors in Gothenburg): shown next to the city stations and labelled as lower quality.
-- **Daily satellite view** (NASA GIBS VIIRS true colour ✓, yesterday's image): an optional imagery layer for clouds, snow, ice and algae blooms.
-- **Seasonal:** pollen forecast (Pollenrapporten ✓) and bathing-water quality (HaV ✓, 30 sites in Göteborg with advisories against bathing).
+- The *Harbour watch* and *Storm watch* missions include the new layers (Storm watch also has the animated wind).
+- ✅ **Animated wind** *(GEV)*: Open-Meteo current wind at 10 m on a 7 × 5 grid (about 13 × 17 km apart, one multi-point request every 15 minutes). Up to 1,500 particles drift with the bilinearly interpolated wind on their own canvas, coloured from light air to gale, with trails kept in world space so they stay put while the camera moves. The bottom bar shows the wind at the centre of the view (gusts in the tooltip). Off by default.
+- ✅ **Citizen air quality** (Sensor.Community, keyless, ODbL): outdoor particle sensors within 20 km, merged per site with their temperature and humidity, every 5 minutes. Coloured with the same European AQI bands as the city stations, smaller, and labelled as indicative (low-cost sensors read high in fog and humid air). Indoor sensors are skipped and positions stay rounded to about 100 m.
+- ✅ **Daily satellite view:** yesterday's NASA GIBS VIIRS NOAA-20 true-colour image as an imagery layer just above the basemap (below radar), about 375 m per pixel. Tiles go through the server, which only proxies the last 30 days, zoom 0–9 and tiles over Scandinavia, and caches them.
+- ✅ **Pollen forecast** (Pollenrapporten, region Göteborg): today's non-zero levels per pollen type (and mould spores) as metric chips in words, from "Low" to "Very high". Nothing is shown outside the season (roughly February to September).
+- ✅ **Bathing water** (HaV Badplatsen): about 70 sites in the Gothenburg area with advice against bathing, abnormal situations and the latest sample (assessment, E. coli, enterococci, algae). The HaV gateway rate-limits hard, so sample results are fetched 3 seconds apart, cached on disk for a day and stop at the first 429. Off by default.
 
 **6.3 Derived intelligence from data we already collect** ✅ done
 - ✅ **24-hour memory** (a first step towards Phase 7):
@@ -503,7 +504,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 2. ViVa stations, ships to Gothenburg and airport weather (harbour and airport picture). ✅
 3. 24-hour memory with sparklines, the situation brief and the delay index. ✅
 4. Spot report, nearest camera and watch areas. ✅
-5. Weather extras and seasonal layers.
+5. Weather extras and seasonal layers. ✅
 6. The 6.5 items as keys arrive.
 
 ### Phase 7 – History and replay

@@ -33,7 +33,20 @@ const DECIMALS: Record<string, number> = {
   min: 0,
 };
 
+/** Pollenrapporten's levels 0–7. */
+export const POLLEN_LEVELS = [
+  'None',
+  'Low',
+  'Low to moderate',
+  'Moderate',
+  'Moderate to high',
+  'High',
+  'High to very high',
+  'Very high',
+];
+
 export function formatMetric(m: Pick<Metric, 'value' | 'unit'>): string {
+  if (m.unit === 'level') return POLLEN_LEVELS[Math.round(m.value)] ?? String(m.value);
   const decimals = DECIMALS[m.unit] ?? 1;
   const value = m.value.toLocaleString('sv-SE', {
     minimumFractionDigits: decimals,

@@ -1006,12 +1006,19 @@ select option {
   margin-top: 4px;
 }
 
-/* Bottom bar clock */
+/* Bottom bar clock and wind reading */
 
-.bottombar .clock {
+.bottombar .clock,
+.bottombar .wind-readout {
   padding-left: 12px;
   font-size: 11px;
   border-left: 1px solid var(--panel-border);
+}
+
+.bottombar .wind-readout {
+  margin-left: auto;
+  color: var(--text);
+  white-space: nowrap;
 }
 
 /* Search */

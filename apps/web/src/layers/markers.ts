@@ -124,6 +124,14 @@ function roadWeatherColor(e: Entity): string {
   return '#a5b4fc';
 }
 
+/** Red for advice against bathing or an unfit sample, amber for remarks, blue when fine. */
+export function bathingColor(e: Entity): string {
+  const sample = e.props?.lastSample;
+  if (e.props?.adviceAgainstBathing || sample === 'Unfit for bathing') return '#f87171';
+  if (e.props?.abnormalSituation || sample === 'Fit, with remarks') return '#fbbf24';
+  return sample ? '#38bdf8' : '#94a3b8';
+}
+
 export const ENTITY_STYLES: Record<string, EntityStyle> = {
   aircraft: {
     icon: 'aircraft',
@@ -276,6 +284,26 @@ export const ENTITY_STYLES: Record<string, EntityStyle> = {
     labelMaxDistance: 20_000,
     scale: 0.85,
     trackRange: 1_500,
+  },
+  'air-quality-community': {
+    icon: 'sensor',
+    color: (e) => AQI_COLORS[(num(e.props?.aqi) ?? 1) - 1] ?? '#94a3b8',
+    label: (e) => {
+      const pm = num(e.props?.pm25Ugm3);
+      return pm !== undefined ? `PM2.5 ${pm.toFixed(0)}` : undefined;
+    },
+    labelMaxDistance: 6_000,
+    staleAfterMs: 30 * 60_000,
+    scale: 0.55,
+    trackRange: 1_000,
+  },
+  bathing: {
+    icon: 'poi',
+    color: bathingColor,
+    label: (e) => e.label,
+    labelMaxDistance: 8_000,
+    scale: 0.75,
+    trackRange: 1_200,
   },
   'water-levels': {
     icon: 'sensor',

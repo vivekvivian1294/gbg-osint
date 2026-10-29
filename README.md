@@ -46,6 +46,7 @@ Keys stay on your machine: the server uses them, and only the CARTO basemap key 
 - Click any vehicle, ship or aircraft for details, `T` to track it and `C` to ride along. Ships, aircraft and trains show where they have been in the last 24 hours. Cards can show the nearest road camera.
 - Right-click the map (long-press on touch, or `W` for the centre) for "What's here?": nearby incidents, the nearest road camera, street-level photos, Wikipedia articles and district statistics.
 - `G` opens the tools: measure, pins, routes and watch areas. A watch area alerts you when an incident appears inside it or a ship or train enters, while the app is open.
+- Under _Layers › Environment_ you can add animated wind, yesterday's satellite image, citizen air sensors, bathing-water quality and (in season) the pollen forecast.
 - Hover the metrics strip, or open a sensor card, for 24-hour sparklines. The server keeps this history in its cache directory, so it survives restarts; it fills up while the server runs.
 - `S` plays camera tours. `1`–`6` switch the optics styles.
 - The URL keeps the camera, layers and tracked object, so links reopen the same view on your own copy.

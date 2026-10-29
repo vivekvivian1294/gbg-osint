@@ -21,6 +21,7 @@ export const ENTITY_SERIES: Readonly<Record<string, Readonly<Record<string, stri
   'env.harbour': { windMs: 'm/s', gustMs: 'm/s', waterLevelCm: 'cm', currentKn: 'kn' },
   'env.water-levels': { levelM: 'm' },
   'env.air-quality': { aqi: 'index' },
+  'env.air-quality-community': { pm25Ugm3: 'µg/m³' },
   'env.road-weather': { surfaceTempC: '°C', airTempC: '°C' },
   'aviation.metar': { windKt: 'kt', ceilingFt: 'ft' },
   'transit.rail': { delayMin: 'min' },

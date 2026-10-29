@@ -73,6 +73,7 @@ export const MISSIONS: readonly Mission[] = [
       'crisis',
       'weather',
       'rain-nowcast',
+      'wind',
       'harbour-stations',
       'sea-level',
       'water-levels',

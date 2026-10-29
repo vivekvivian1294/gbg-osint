@@ -59,6 +59,7 @@ import {
 } from './layers/contacts';
 import { buildMarkers } from './layers/markers';
 import { classifyDistricts, DEFAULT_DISTRICT_METRIC } from './layers/districts';
+import { buildWindField, compass, windAt } from './layers/wind';
 import {
   DEFAULT_LAYERS,
   LAYERS,
@@ -160,6 +161,7 @@ export function App() {
   const [rosterRefs, setRosterRefs] = useState<TrackRef[] | null>(null);
   const [toast, setToast] = useState('');
   const [spot, setSpot] = useState<LonLat | null>(null);
+  const [centre, setCentre] = useState<LonLat | null>(null);
   const spotData = useSpot(spot);
   const [watcher] = useState(() => new Watcher());
   const [alerts, setAlerts] = useState<WatchAlert[]>([]);
@@ -294,6 +296,13 @@ export function App() {
           ),
       }
     : null;
+
+  const windVersion = isActive('wind') ? live.version('env.wind') : -1;
+  const wind = useMemo(
+    () => (windVersion < 0 ? null : buildWindField(live.items('env.wind'))),
+    [live, windVersion],
+  );
+  const centreWind = wind && centre ? windAt(wind, centre[0], centre[1]) : undefined;
 
   const districtsVersion = isActive('districts') ? live.version('context.districts') : -1;
   const districts = useMemo(() => {
@@ -675,6 +684,8 @@ export function App() {
         traffic={featureSet('traffic')}
         travelTimes={featureSet('travel-times')}
         trail={trail ?? null}
+        wind={wind}
+        satellite={isActive('satellite')}
         radar={radarFrames}
         buildings={isActive('buildings')}
         cameraViews={cameraViews}
@@ -687,6 +698,7 @@ export function App() {
         radarStore={radarStore}
         tourStore={tourStore}
         onCameraSettled={setCamera}
+        onCentreSettled={setCentre}
         onPick={(pick) => {
           setSelection(pick);
           setSpot(null);
@@ -861,6 +873,14 @@ export function App() {
       )}
       <footer className="bottombar">
         <CameraReadout store={cameraStore} />
+        {centreWind && (
+          <span
+            className="wind-readout"
+            title={`Open-Meteo model wind at the centre of the view${centreWind.gust !== undefined ? `; gusts ${centreWind.gust.toFixed(1)} m/s` : ''}`}
+          >
+            WIND {centreWind.speed.toFixed(1)} m/s {compass(centreWind.fromDeg)}
+          </span>
+        )}
         <Clock />
       </footer>
       {radarFrames && (

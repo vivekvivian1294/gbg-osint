@@ -221,7 +221,7 @@ const EAQI_BANDS: Record<string, readonly number[]> = {
   no2Ugm3: [40, 90, 120, 230, 340],
   o3Ugm3: [50, 100, 130, 240, 380],
 };
-const EAQI_LABELS = ['Good', 'Fair', 'Moderate', 'Poor', 'Very poor', 'Extremely poor'];
+export const EAQI_LABELS = ['Good', 'Fair', 'Moderate', 'Poor', 'Very poor', 'Extremely poor'];
 
 export function airQualityIndex(props: Record<string, unknown>): number | undefined {
   let worst: number | undefined;

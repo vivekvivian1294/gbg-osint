@@ -6,10 +6,12 @@ import { openFreeMapBuildings } from './buildings';
 import { celestrak } from './celestrak';
 import { elpris } from './elpris';
 import { energyChartsSweden } from './energyCharts';
+import { nasaGibs } from './gibs';
 import { goteborgAirQuality, goteborgTraffic, goteborgWaterLevels } from './goteborg';
 import { metNowcast, vivaHarbour } from './harbour';
 import { krisinformation } from './krisinformation';
 import { styrOchStall } from './nextbike';
+import { openMeteoWind } from './openMeteo';
 import { osmPois, osmWaterways } from './osm';
 import { polisenEvents } from './polisen';
 import { radioStations } from './radio';
@@ -18,6 +20,8 @@ import { trafikverketFerries, trafikverketTravelTimes } from './roadsAndFerries'
 import { osrmRoutes } from './routing';
 import { rssNews } from './rss';
 import { scbDistricts } from './scb';
+import { bathingWaters, pollenForecast } from './seasonal';
+import { sensorCommunity } from './sensorCommunity';
 import { smhiForecast } from './smhiForecast';
 import { smhiObservations, smhiSeaLevel } from './smhiObservations';
 import { smhiRadar } from './smhiRadar';
@@ -79,4 +83,9 @@ export const connectors: readonly Connector[] = [
   vivaHarbour,
   metNowcast,
   wikipediaNearby,
+  openMeteoWind,
+  sensorCommunity,
+  pollenForecast,
+  bathingWaters,
+  nasaGibs,
 ];

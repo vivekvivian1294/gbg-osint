@@ -52,9 +52,14 @@ const PRECISION_NOTE: Record<string, string> = {
   area: 'Covers an area.',
 };
 
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 function formatValue(value: unknown): string {
   if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(2);
   if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (typeof value === 'string' && ISO_TIME.test(value) && Number.isFinite(Date.parse(value))) {
+    return timeFormat.format(new Date(value));
+  }
   return String(value);
 }
 
@@ -94,6 +99,21 @@ const PROP_LABELS: Record<string, string> = {
   levelM: 'Water level (m)',
   aqi: 'Air quality index',
   surfaceTempC: 'Road surface (°C)',
+  pm25Ugm3: 'PM2.5 (µg/m³)',
+  pm10Ugm3: 'PM10 (µg/m³)',
+  humidityPct: 'Humidity (%)',
+  aqiLabel: 'Air quality',
+  sensors: 'Sensors',
+  waterType: 'Water',
+  euBathingWater: 'EU bathing water',
+  adviceAgainstBathing: 'Advice against bathing',
+  adviceSince: 'Advice since',
+  abnormalSituation: 'Abnormal situation',
+  lastSample: 'Latest sample',
+  sampledAt: 'Sampled',
+  algae: 'Algae',
+  eColiPer100ml: 'E. coli (per 100 ml)',
+  enterococciPer100ml: 'Enterococci (per 100 ml)',
 };
 const CAMERA_PHOTO = /^https:\/\/api\.trafikinfo\.trafikverket\.se\/[\w./-]+\.jpg$/i;
 
