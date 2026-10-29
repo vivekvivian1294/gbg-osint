@@ -420,17 +420,15 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - Sources marked ✓ were checked on 2026-10-28.
 - Ideas marked *(GEV)* come from God's Eye View.
 
-**6.1 Quick wins with keys we already have**
-- **Live trains** (Trafikverket `TrainPosition` ✓):
-  - Train positions in the Gothenburg area, shown with the existing 3D train model and smooth playback.
-  - The card shows the train number, destination and delay (from `TrainAnnouncement`).
-- **Rail operational events** (Trafikverket `OperativeEvent` ✓): stops such as "police/illness" in the feed and on the map.
-- **Road ferries** (Trafikverket `FerryAnnouncement` and `FerryRoute` ✓):
-  - Departures for Hönöleden, Björköleden, Lyrleden and other nearby routes on the Boards panel.
-  - The ferries themselves already appear via AIS.
-- **Road travel times** (Trafikverket `TravelTimeRoute` ✓): five measured stretches, such as *E45 Järntorget – Centrum* and *E6 Norr Bäckebolsmotet – Tingstadstunneln*. Each is drawn on its road geometry and coloured by speed against free flow.
-- **Airport weather** (aviationweather.gov METAR/TAF ✓, keyless): ESGG and ESGP shown on the flight board, the aircraft card and the ride-along view.
-- **Flight routes** (adsbdb ✓, keyless): origin and destination on aircraft cards, e.g. *SK1405 GOT→CPH*.
+**6.1 Quick wins with keys we already have** ✅ done
+- **Live trains** (Trafikverket `TrainPosition`): every train in the area, on the 3D train model (two cars that bend through curves) with smooth playback, map-matched to OSM rail with left-hand running. The card shows train number, destination, delay at the last station passed, service and operator (from `TrainAnnouncement`). Västtrafik's few trains are hidden while this layer has data, so trains aren't drawn twice.
+- **Rail disruptions** (Trafikverket `OperativeEvent`): current events within 80 km in the feed and on the map, with the affected section (e.g. *Göteborg C–Alingsås*). The WGS84 points come as `lat lon` and are swapped.
+- **Road ferries** (Trafikverket `FerryAnnouncement`): one board per route (Hönöleden, Björköleden, Nordöleden, Kornhallsleden, Lyrleden) for the next three hours, with From/To columns.
+- **Road travel times** (Trafikverket `TravelTimeRoute`): the measured stretches in Västra Götaland drawn on their road, each direction offset to its right, coloured by Trafikverket's status or by speed against free flow. Clicking one shows travel time, free-flow time, speed and length.
+- **Airport weather** (aviationweather.gov METAR/TAF, keyless): ESGG and ESGP as map markers coloured by flight category, with the raw METAR and TAF on the card. The latest Landvetter METAR is shown above the flight board.
+- **Flight routes** (adsbdb, keyless, on demand): aircraft cards show e.g. *SK1405 ARN→CPH (Stockholm → Copenhagen)* and the airline. Lookups are throttled and cached, including unknown callsigns.
+- **Routing upgrade:** map-matching routes are now direction-aware: no sharp turns or reversals on rails (a train can't back through a switch), a U-turn penalty on roads and a penalty for setting off against the heading. This removed the zig-zag paths through station crossovers.
+- Still open: airport weather in the ride-along view.
 
 **6.2 Harbour, sea and weather**
 - **Sjöfartsverket ViVa** ✓: 13 stations around the harbour and inlet (Vinga, Tångudden, Torshamnen, Karet, Eriksberg, Hisingsbron, Jordfallsbron, Skallen, Måvholmsbådan and others). Each gives wind, gusts, water level and current where measured, which fits the *Harbour watch* mission.

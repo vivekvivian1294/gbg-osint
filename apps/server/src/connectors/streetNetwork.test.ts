@@ -154,6 +154,33 @@ describe('line graph', () => {
     ]);
     expect(g.route(from, to, 100)).toBeUndefined();
   });
+
+  it("doesn't reverse rail vehicles through a switch", () => {
+    const g = new LineGraph();
+    g.addLine([0, 0, 100, 0, 200, 0]);
+    g.addLine([100, 0, 20, 4]);
+    const from = g.snap(50, 0, 5)!;
+    const to = g.snap(40, 3, 5)!;
+    expect(g.route(from, to, 1_000)).toBeDefined();
+    expect(g.route(from, to, 1_000, MATCH_OPTIONS.rail, 90)).toBeUndefined();
+  });
+
+  it('penalises setting off backwards and U-turns on roads', () => {
+    const g = new LineGraph();
+    g.addLine([0, 0, 50, 0, 100, 0]);
+    const behind = g.route(g.snap(70, 0, 5)!, g.snap(30, 0, 5)!, 100, MATCH_OPTIONS.road, 90);
+    expect(behind).toBeUndefined();
+    expect(g.route(g.snap(70, 0, 5)!, g.snap(30, 0, 5)!, 100)).toBeDefined();
+
+    const v = new LineGraph();
+    v.addLine([0, 0, 100, 0]);
+    v.addLine([100, 0, 0, 1]);
+    const from = v.snap(60, 0, 5)!;
+    const to = v.snap(40, 0.6, 0.5)!;
+    expect(v.route(from, to, 200)).toBeDefined();
+    expect(v.route(from, to, 200, MATCH_OPTIONS.road, 90)).toBeUndefined();
+    expect(v.route(from, to, 300, MATCH_OPTIONS.road, 90)).toBeDefined();
+  });
 });
 
 describe('map matching', () => {
@@ -209,7 +236,7 @@ describe('västtrafik vehicles on the network', () => {
   const network = new StreetNetwork();
   for (let x = 8735; x <= 8737; x++)
     for (let y = 4958; y <= 4960; y++) network.add(emptyTile(x, y));
-  const track = [cx, cy, cx, cy + 60, cx + 120, cy + 60];
+  const track = [cx, cy, cx, cy + 50, cx + 5, cy + 58.7, cx + 10, cy + 60, cx + 120, cy + 60];
   network.graphs.tram.addLine(track);
 
   it('snaps trams to the track and sends the route travelled', () => {
@@ -224,10 +251,9 @@ describe('västtrafik vehicles on the network', () => {
       network,
     );
     const e = second.entities[0]!;
-    expect(e.via).toHaveLength(1);
-    const [vx, vy] = toLocalM(e.via![0]!);
-    expect(vx - cx).toBeCloseTo(0, 0);
-    expect(vy - cy).toBeCloseTo(60, 0);
+    const via = e.via!.map((p) => toLocalM(p)).map(([x, y]) => [x - cx, y - cy]);
+    expect(via.length).toBeGreaterThanOrEqual(2);
+    expect(via.some(([x, y]) => Math.hypot(x! - 5, y! - 58.7) < 0.5)).toBe(true);
     expect(e.heading).toBeCloseTo(90, 0);
     expect(EntitySchema.safeParse(e).success).toBe(true);
   });

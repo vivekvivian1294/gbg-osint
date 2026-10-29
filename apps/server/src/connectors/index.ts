@@ -1,6 +1,7 @@
 import type { Connector } from '../core/connector';
 import { adsbFi } from './aircraft';
 import { aisstreamShips } from './aisstream';
+import { airportWeather, flightRoutes } from './aviation';
 import { openFreeMapBuildings } from './buildings';
 import { celestrak } from './celestrak';
 import { elpris } from './elpris';
@@ -11,6 +12,8 @@ import { styrOchStall } from './nextbike';
 import { osmPois, osmWaterways } from './osm';
 import { polisenEvents } from './polisen';
 import { radioStations } from './radio';
+import { trafikverketRailEvents, trafikverketTrainPositions } from './rail';
+import { trafikverketFerries, trafikverketTravelTimes } from './roadsAndFerries';
 import { osrmRoutes } from './routing';
 import { rssNews } from './rss';
 import { scbDistricts } from './scb';
@@ -65,4 +68,10 @@ export const connectors: readonly Connector[] = [
   socialPosts,
   radioStations,
   osrmRoutes,
+  trafikverketTrainPositions,
+  trafikverketRailEvents,
+  trafikverketFerries,
+  trafikverketTravelTimes,
+  airportWeather,
+  flightRoutes,
 ];

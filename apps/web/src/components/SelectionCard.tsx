@@ -11,9 +11,11 @@ import {
 } from '@gbg-osint/shared';
 import type { ReactNode } from 'react';
 import type { PickRef } from '../engine/markerSpec';
+import { flowRatio } from '../engine/travelTimes';
 import type { Contact } from '../layers/contacts';
 import { DISTRICT_METRICS } from '../layers/districts';
 import { LAYER_BY_ID } from '../layers/registry';
+import { useFlightRoute } from '../state/flightRoutes';
 
 interface SelectionCardProps {
   selection: PickRef;
@@ -41,7 +43,28 @@ function formatValue(value: unknown): string {
 }
 
 /** Props used for styling or rendered separately rather than listed. */
-const HIDDEN_PROPS = new Set(['color', 'textColor', 'photoUrl']);
+const HIDDEN_PROPS = new Set(['color', 'textColor', 'photoUrl', 'metar', 'taf']);
+
+/** Readable names for props that would otherwise show as code. */
+const PROP_LABELS: Record<string, string> = {
+  train: 'Train',
+  destination: 'Destination',
+  product: 'Service',
+  operator: 'Operator',
+  matched: 'Snapped to',
+  delayMin: 'Delay (min)',
+  lastStation: 'Last station',
+  speedKmh: 'Speed (km/h)',
+  flightCategory: 'Flight category',
+  windDir: 'Wind direction',
+  windKt: 'Wind (kt)',
+  gustKt: 'Gusts (kt)',
+  ceilingFt: 'Ceiling (ft)',
+  tempC: 'Temperature (°C)',
+  dewpointC: 'Dew point (°C)',
+  qnhHpa: 'QNH (hPa)',
+  visibility: 'Visibility (SM)',
+};
 const CAMERA_PHOTO = /^https:\/\/api\.trafikinfo\.trafikverket\.se\/[\w./-]+\.jpg$/i;
 
 function CameraPhoto({ entity }: { entity: Entity }) {
@@ -133,13 +156,44 @@ function PhotoDetails({ entity }: { entity: Entity }) {
   );
 }
 
+function FlightRouteRow({ callsign }: { callsign: unknown }) {
+  const route = useFlightRoute(typeof callsign === 'string' ? callsign : undefined);
+  if (!route) return null;
+  const code = (a: typeof route.origin) => a.iata ?? a.icao;
+  const place = (a: typeof route.origin) => a.city ?? a.name;
+  return (
+    <>
+      <Row term="Route">
+        {route.flight ?? route.callsign} {code(route.origin)}→{code(route.destination)}
+        <span className="muted">
+          {' '}
+          ({place(route.origin)} → {place(route.destination)})
+        </span>
+      </Row>
+      {route.airline && <Row term="Airline">{route.airline}</Row>}
+    </>
+  );
+}
+
+function RawReport({ label, text }: { label: string; text: unknown }) {
+  if (typeof text !== 'string') return null;
+  return (
+    <>
+      <p className="muted">{label}</p>
+      <pre className="raw-report">{text}</pre>
+    </>
+  );
+}
+
 function EntityDetails({ entity }: { entity: Entity }) {
+  const p = entity.props ?? {};
   return (
     <>
       <h3>{entity.label ?? entity.id}</h3>
       {entity.kind === 'camera' && <CameraPhoto entity={entity} />}
       <dl>
         <Row term="Updated">{timeFormat.format(new Date(entity.ts))}</Row>
+        {p.callsign !== undefined && <FlightRouteRow callsign={p.callsign} />}
         {entity.alt !== undefined && entity.alt > 0 && (
           <Row term="Altitude">{Math.round(entity.alt).toLocaleString('sv-SE')} m</Row>
         )}
@@ -147,10 +201,10 @@ function EntityDetails({ entity }: { entity: Entity }) {
           <Row term="Speed">{Math.round(entity.speed * 3.6).toLocaleString('sv-SE')} km/h</Row>
         )}
         {entity.heading !== undefined && <Row term="Heading">{Math.round(entity.heading)}°</Row>}
-        {Object.entries(entity.props ?? {})
+        {Object.entries(p)
           .filter(([k]) => !HIDDEN_PROPS.has(k))
           .map(([k, v]) => (
-            <Row key={k} term={k}>
+            <Row key={k} term={PROP_LABELS[k] ?? k}>
               {typeof v === 'string' && /^https:\/\//.test(v) ? (
                 <a href={v} target="_blank" rel="noopener noreferrer">
                   link
@@ -162,6 +216,8 @@ function EntityDetails({ entity }: { entity: Entity }) {
           ))}
         <Row term="Source">{entity.source}</Row>
       </dl>
+      <RawReport label="METAR" text={p.metar} />
+      <RawReport label="TAF" text={p.taf} />
       {entity.kind === 'camera' && entity.heading !== undefined && (
         <p className="approx-note">
           The viewing area on the map is an estimate from the camera&apos;s published direction.
@@ -251,6 +307,38 @@ function TrafficDetails({ feature }: { feature: Feature }) {
   );
 }
 
+const minutes = (s: number) =>
+  `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+
+function TravelTimeDetails({ feature }: { feature: Feature }) {
+  const p = feature.props ?? {};
+  const num = (v: unknown) => (typeof v === 'number' ? v : undefined);
+  const travel = num(p.travelTimeS);
+  const free = num(p.freeFlowS);
+  const ratio = flowRatio(p);
+  return (
+    <>
+      <h3>{feature.label ?? 'Measured stretch'}</h3>
+      <dl>
+        {travel !== undefined && <Row term="Travel time">{minutes(travel)} min</Row>}
+        {free !== undefined && <Row term="At free flow">{minutes(free)} min</Row>}
+        {ratio !== undefined && ratio < 0.98 && (
+          <Row term="Slower by">{Math.round((1 / ratio - 1) * 100)} %</Row>
+        )}
+        {num(p.speedKmh) !== undefined && (
+          <Row term="Average speed">{Math.round(num(p.speedKmh)!)} km/h</Row>
+        )}
+        {num(p.lengthM) !== undefined && (
+          <Row term="Length">{(num(p.lengthM)! / 1000).toFixed(1)} km</Row>
+        )}
+        {typeof p.status === 'string' && <Row term="Status">{p.status}</Row>}
+        <Row term="Measured">{timeFormat.format(new Date(feature.ts))}</Row>
+        <Row term="Source">Trafikverket</Row>
+      </dl>
+    </>
+  );
+}
+
 export interface TrackingControls {
   trackable: boolean;
   tracking: boolean;
@@ -310,6 +398,7 @@ export function SelectionCard({ selection, items, tracking, onClose }: Selection
             ))}
           {isEvent(item) && <EventDetails event={item} />}
           {isFeature(item) && item.kind === 'traffic' && <TrafficDetails feature={item} />}
+          {isFeature(item) && item.kind === 'travel-time' && <TravelTimeDetails feature={item} />}
           {isArea(item) && <AreaDetails area={item} />}
         </article>
       ))}

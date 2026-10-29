@@ -7,6 +7,8 @@ interface BoardsPanelProps {
   hasBoardLayers: boolean;
   /** Live aircraft by callsign, so flights on the board can be tracked on the map. */
   aircraftByCallsign: ReadonlyMap<string, TrackRef>;
+  /** A line shown above a board, e.g. the airport's latest METAR. */
+  notes?: ReadonlyMap<string, string>;
   onTrack(ref: TrackRef): void;
 }
 
@@ -59,6 +61,7 @@ export function BoardsPanel({
   rows,
   hasBoardLayers,
   aircraftByCallsign,
+  notes,
   onTrack,
 }: BoardsPanelProps) {
   const boards = [...new Set(rows.map((r) => r.board))].sort(
@@ -94,6 +97,9 @@ export function BoardsPanel({
     .slice(0, MAX_ROWS);
   const placeHeader = shownDirection === 'arrival' ? 'From' : 'To';
   const platformHeader = onBoard[0]?.mode === 'flight' ? 'Gate' : 'Pl.';
+  // Road ferry boards list where each crossing leaves from instead of a line.
+  const roadFerries = onBoard.every((r) => r.mode === 'ferry' && r.source === 'trafikverket');
+  const note = notes?.get(board);
 
   return (
     <div className="boards">
@@ -127,6 +133,7 @@ export function BoardsPanel({
           </div>
         )}
       </div>
+      {note && <p className="board-note">{note}</p>}
       {visible.length === 0 ? (
         <p className="empty">Nothing scheduled in the next hours.</p>
       ) : (
@@ -134,7 +141,7 @@ export function BoardsPanel({
           <thead>
             <tr>
               <th scope="col">Time</th>
-              <th scope="col">Line</th>
+              <th scope="col">{roadFerries ? 'From' : 'Line'}</th>
               <th scope="col">{placeHeader}</th>
               <th scope="col">{platformHeader}</th>
             </tr>

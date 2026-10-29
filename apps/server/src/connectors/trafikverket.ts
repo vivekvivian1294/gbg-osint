@@ -56,6 +56,16 @@ async function query(ctx: ConnectorContext, objectType: string, queryXml: string
   return Array.isArray(items) ? (items as unknown[]) : [];
 }
 
+/** Shared by the Trafikverket connectors in other files. */
+export const TRAFIKVERKET = {
+  host: HOST,
+  licence: LICENCE,
+  homepage: HOMEPAGE,
+  requiredEnv: REQUIRED_ENV,
+  box: BOX,
+} as const;
+export { query as trafikverketQuery, xmlAttr };
+
 // --- Road situations (accidents, roadworks, closures) ---
 
 const ROAD_EVENTS = 'events.road';
@@ -220,19 +230,19 @@ const TrainStation = z.object({
 let stationNames = new Map<string, string>();
 let stationsLoadedAt = 0;
 
+/** All operational locations, not only passenger stations: trains pass junctions and yards too. */
 async function loadStationNames(ctx: ConnectorContext): Promise<Map<string, string>> {
   if (stationNames.size > 0 && Date.now() - stationsLoadedAt < STATIONS_TTL_MS) return stationNames;
-  const cached = await ctx.cache.get<unknown[]>('stations', STATIONS_TTL_MS);
+  const cached = await ctx.cache.get<unknown[]>('locations', STATIONS_TTL_MS);
   const raw =
     cached?.value ??
     (await query(
       ctx,
       'TrainStation',
       `<QUERY objecttype="TrainStation" namespace="rail.infrastructure" schemaversion="1.5">` +
-        `<FILTER><EQ name="Advertised" value="true" /></FILTER>` +
         `<INCLUDE>LocationSignature</INCLUDE><INCLUDE>AdvertisedLocationName</INCLUDE></QUERY>`,
     ));
-  if (!cached) await ctx.cache.set('stations', raw);
+  if (!cached) await ctx.cache.set('locations', raw);
   const names = new Map<string, string>();
   for (const item of raw) {
     const s = TrainStation.safeParse(item);
@@ -242,6 +252,7 @@ async function loadStationNames(ctx: ConnectorContext): Promise<Map<string, stri
   stationsLoadedAt = cached?.savedAt ?? Date.now();
   return names;
 }
+export { loadStationNames };
 
 const TRAIN_FIELDS = [
   'ActivityId',

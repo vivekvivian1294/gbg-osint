@@ -1,24 +1,17 @@
-import {
-  GOTHENBURG,
-  type Departure,
-  type Entity,
-  type LonLat,
-  type TransportMode,
-} from '@gbg-osint/shared';
+import { GOTHENBURG, type Departure, type Entity, type TransportMode } from '@gbg-osint/shared';
 import { z } from 'zod';
 import type { ConnectorContext, PollConnector } from '../core/connector';
 import { UpstreamError } from '../core/http';
 import { OPENFREEMAP_HOST } from './buildings';
 import {
-  MATCH_OPTIONS,
-  StreetNetwork,
-  matchMove,
-  tilesNear,
-  toLonLatPath,
-  type MatchState,
+  STREET_NETWORK,
+  placeOnNetwork,
+  rankTiles,
   type NetworkName,
+  type Placed,
+  type StreetNetwork,
 } from './streetNetwork';
-import { bearing, distanceM, fromLocalM, isoTime, toLocalM, truncate } from './util';
+import { bearing, distanceM, isoTime, truncate } from './util';
 
 const HOST = 'ext-api.vasttrafik.se';
 const API = `https://${HOST}/pr/v4`;
@@ -39,9 +32,8 @@ const TOKEN_MARGIN_MS = 5 * 60_000;
 /** Which network each mode is matched to, and how the match is labelled. */
 const NETWORK_BY_MODE: Record<string, NetworkName> = { tram: 'tram', bus: 'road', train: 'rail' };
 const MATCHED: Record<NetworkName, string> = { tram: 'track', road: 'street', rail: 'rail' };
-/** Network tiles are loaded this far around vehicles, and must be loaded this far to match. */
+/** Network tiles are loaded this far around vehicles. */
 const NETWORK_MARGIN_M = 150;
-const NETWORK_READY_M = 60;
 /** New network tiles fetched per poll; the disk cache keeps them for 30 days. */
 const NETWORK_FETCHES_PER_POLL = 24;
 
@@ -137,47 +129,26 @@ export interface Track {
   heading?: number;
 }
 
-const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
-
-function networkReady(network: StreetNetwork, points: readonly { lon: number; lat: number }[]) {
-  return points.every((p) =>
-    tilesNear(p.lon, p.lat, NETWORK_READY_M).every(([x, y]) => network.has(x, y)),
-  );
-}
-
 /** Network tiles around matchable vehicles (and where they were), trams first. */
 export function networkTilesFor(
   raw: readonly unknown[],
   previous: ReadonlyMap<string, Track>,
 ): [number, number][] {
-  const weights = new Map<string, { tile: [number, number]; weight: number }>();
+  const points: { lon: number; lat: number; weight: number }[] = [];
   for (const item of raw) {
     const parsed = Position.safeParse(item);
     if (!parsed.success) continue;
     const p = parsed.data;
     if (!NETWORK_BY_MODE[p.line.transportMode]) continue;
     const weight = p.line.transportMode === 'tram' ? 3 : 1;
+    points.push({ lon: p.longitude, lat: p.latitude, weight });
     const prev = previous.get(p.detailsReference);
-    for (const point of [{ lon: p.longitude, lat: p.latitude }, ...(prev ? [prev] : [])]) {
-      for (const tile of tilesNear(point.lon, point.lat, NETWORK_MARGIN_M)) {
-        const key = tile.join('/');
-        const entry = weights.get(key);
-        if (entry) entry.weight += weight;
-        else weights.set(key, { tile, weight });
-      }
-    }
+    if (prev) points.push({ ...prev, weight });
   }
-  return [...weights.values()].sort((a, b) => b.weight - a.weight).map((e) => e.tile);
+  return rankTiles(points, NETWORK_MARGIN_M);
 }
 
-interface Placement {
-  lon: number;
-  lat: number;
-  /** Direction of travel (kept for the next poll). */
-  heading?: number;
-  /** Street or track bearing, shown until the direction of travel is known. */
-  axis?: number;
-  via?: LonLat[];
+interface Placement extends Placed {
   matched?: string;
 }
 
@@ -189,26 +160,8 @@ function place(
   network: StreetNetwork | undefined,
 ): Placement {
   const name = NETWORK_BY_MODE[mode];
-  if (name && network && networkReady(network, prev ? [here, prev] : [here])) {
-    const [x, y] = toLocalM([here.lon, here.lat]);
-    let state: MatchState | undefined;
-    if (prev) {
-      const [px, py] = toLocalM([prev.lon, prev.lat]);
-      state = { x: px, y: py, ...(prev.heading !== undefined && { heading: prev.heading }) };
-    }
-    const match = matchMove(network.graphs[name], state, x, y, MATCH_OPTIONS[name]);
-    if (match) {
-      const [lon, lat] = fromLocalM([match.x, match.y]);
-      return {
-        lon: round6(lon),
-        lat: round6(lat),
-        ...(match.heading !== undefined && { heading: Math.round(match.heading * 10) / 10 }),
-        ...(match.axis !== undefined && { axis: Math.round(match.axis * 10) / 10 }),
-        ...(match.via.length > 0 && { via: toLonLatPath(match.via) }),
-        matched: MATCHED[name],
-      };
-    }
-  }
+  const placed = name && network ? placeOnNetwork(network, name, here, prev) : undefined;
+  if (placed) return { ...placed, matched: MATCHED[name!] };
   const heading =
     prev && distanceM(prev, here) >= MIN_HEADING_MOVE_M ? bearing(prev, here) : prev?.heading;
   return { ...here, ...(heading !== undefined && { heading }) };
@@ -306,7 +259,7 @@ async function positionsIn(
 }
 
 let tracks = new Map<string, Track>();
-const network = new StreetNetwork();
+const network = STREET_NETWORK;
 
 export const vasttrafikVehicles: PollConnector = {
   id: 'vasttrafik.vehicles',

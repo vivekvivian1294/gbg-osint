@@ -161,6 +161,16 @@ const MAX_EXPANSIONS = 40_000;
 /** Snapping penalty per unit of extra cost, so main streets win over parallel service roads. */
 const COST_SNAP_PENALTY_M = 10;
 const RAD = Math.PI / 180;
+const U_TURN_DEG = 150;
+
+export interface RouteOptions {
+  /** Sharper turns at a node are impossible (rail vehicles can't reverse through a switch). */
+  maxTurnDeg?: number;
+  /** Extra cost of turning back at a node (e.g. a bus U-turn). */
+  uTurnPenaltyM?: number;
+  /** Extra cost of setting off against the direction of travel. */
+  backwardPenaltyM?: number;
+}
 
 const cellKey = (ix: number, iy: number) => (ix + GRID_OFFSET) * GRID_SPAN + (iy + GRID_OFFSET);
 
@@ -325,8 +335,17 @@ export class LineGraph {
     return best;
   }
 
-  /** Shortest path along the network between two snapped points (A*), or undefined. */
-  route(from: GraphSnap, to: GraphSnap, maxCost: number): [number, number][] | undefined {
+  /**
+   * Shortest path along the network between two snapped points (A* over directed segments, so
+   * turns can be limited), or undefined. `heading` is the direction of travel at `from`.
+   */
+  route(
+    from: GraphSnap,
+    to: GraphSnap,
+    maxCost: number,
+    opts: RouteOptions = {},
+    heading?: number,
+  ): [number, number][] | undefined {
     if (this.segA[from.seg]! < 0 || this.segA[to.seg]! < 0) return undefined;
     if (from.seg === to.seg) {
       return [
@@ -334,54 +353,86 @@ export class LineGraph {
         [to.x, to.y],
       ];
     }
+    // A state is a segment traversed towards one of its ends: seg * 2 + (towards B ? 1 : 0).
+    const nodeOf = (st: number) => (st & 1 ? this.segB[st >> 1]! : this.segA[st >> 1]!);
+    const fromOf = (st: number) => (st & 1 ? this.segA[st >> 1]! : this.segB[st >> 1]!);
     const g = new Map<number, number>();
     const prev = new Map<number, number>();
     const heap = new MinHeap();
     const h = (n: number) => Math.hypot(this.xs[n]! - to.x, this.ys[n]! - to.y);
+    const turnCost = (a: number, b: number, c: number) => this.turnCost(a, b, c, opts);
+    const hx = heading !== undefined ? Math.sin(heading * RAD) : 0;
+    const hy = heading !== undefined ? Math.cos(heading * RAD) : 0;
     const startLen = this.weight(from.seg);
-    const starts: [number, number][] = [
-      [this.segA[from.seg]!, from.t * startLen],
-      [this.segB[from.seg]!, (1 - from.t) * startLen],
-    ];
-    for (const [node, cost] of starts) {
-      g.set(node, cost);
-      prev.set(node, -1);
-      heap.push(cost + h(node), node);
+    for (const towardsB of [true, false]) {
+      const st = from.seg * 2 + (towardsB ? 1 : 0);
+      const node = nodeOf(st);
+      const dx = this.xs[node]! - from.x;
+      const dy = this.ys[node]! - from.y;
+      const backwards = heading !== undefined && dx * hx + dy * hy < 0;
+      const cost =
+        (towardsB ? 1 - from.t : from.t) * startLen +
+        (backwards ? (opts.backwardPenaltyM ?? 0) : 0);
+      g.set(st, cost);
+      prev.set(st, -1);
+      heap.push(cost + h(node), st);
     }
     const goalLen = this.weight(to.seg);
     const goalA = this.segA[to.seg]!;
     const goalB = this.segB[to.seg]!;
     let best = maxCost;
-    let bestNode = -1;
+    let bestState = -1;
     let expansions = 0;
     while (heap.size > 0 && heap.peek() < best && expansions++ < MAX_EXPANSIONS) {
       const key = heap.peek();
-      const node = heap.pop();
-      const gn = g.get(node)!;
-      if (key > gn + h(node) + 1e-6) continue;
-      const extra = node === goalA ? to.t * goalLen : node === goalB ? (1 - to.t) * goalLen : -1;
-      if (extra >= 0 && gn + extra < best) {
-        best = gn + extra;
-        bestNode = node;
+      const st = heap.pop();
+      const node = nodeOf(st);
+      const back = fromOf(st);
+      const gs = g.get(st)!;
+      if (key > gs + h(node) + 1e-6) continue;
+      if ((node === goalA || node === goalB) && st >> 1 !== to.seg) {
+        const onward = node === goalA ? goalB : goalA;
+        const turn = turnCost(back, node, onward);
+        const extra = (node === goalA ? to.t : 1 - to.t) * goalLen + turn;
+        if (turn < Infinity && gs + extra < best) {
+          best = gs + extra;
+          bestState = st;
+        }
       }
       for (const s of this.nodeSegs[node]!) {
+        if (s === st >> 1) continue;
         const next = this.segA[s] === node ? this.segB[s]! : this.segA[s]!;
-        const cost = gn + this.weight(s);
-        if (cost >= best || cost >= (g.get(next) ?? Infinity)) continue;
-        g.set(next, cost);
-        prev.set(next, node);
-        heap.push(cost + h(next), next);
+        const cost = gs + this.weight(s) + turnCost(back, node, next);
+        const ns = s * 2 + (next === this.segB[s] ? 1 : 0);
+        if (cost >= best || cost >= (g.get(ns) ?? Infinity)) continue;
+        g.set(ns, cost);
+        prev.set(ns, st);
+        heap.push(cost + h(next), ns);
       }
     }
-    if (bestNode < 0) return undefined;
+    if (bestState < 0) return undefined;
     const chain: number[] = [];
-    for (let n = bestNode; n >= 0; n = prev.get(n)!) chain.push(n);
+    for (let st = bestState; st >= 0; st = prev.get(st)!) chain.push(nodeOf(st));
     chain.reverse();
     return [
       [from.x, from.y],
       ...chain.map((n): [number, number] => [this.xs[n]!, this.ys[n]!]),
       [to.x, to.y],
     ];
+  }
+
+  /** Extra cost of turning at `b` when coming from `a` and going on to `c` (Infinity = not allowed). */
+  private turnCost(a: number, b: number, c: number, opts: RouteOptions): number {
+    if (opts.maxTurnDeg === undefined && opts.uTurnPenaltyM === undefined) return 0;
+    const ix = this.xs[b]! - this.xs[a]!;
+    const iy = this.ys[b]! - this.ys[a]!;
+    const ox = this.xs[c]! - this.xs[b]!;
+    const oy = this.ys[c]! - this.ys[b]!;
+    const len = Math.hypot(ix, iy) * Math.hypot(ox, oy);
+    if (len === 0) return 0;
+    const deviation = Math.acos(Math.max(-1, Math.min(1, (ix * ox + iy * oy) / len))) / RAD;
+    if (opts.maxTurnDeg !== undefined && deviation > opts.maxTurnDeg) return Infinity;
+    return deviation > U_TURN_DEG ? (opts.uTurnPenaltyM ?? 0) : 0;
   }
 
   private weight(s: number): number {
@@ -481,7 +532,7 @@ export class LineGraph {
 
 // --- Map matching ---
 
-export interface MatchOptions {
+export interface MatchOptions extends RouteOptions {
   maxSnapM: number;
   /** Shifts the position towards the running side before snapping: + right, − left. */
   sideBiasM: number;
@@ -490,9 +541,27 @@ export interface MatchOptions {
 
 /** Trams run on the right in Gothenburg; Swedish railways run on the left. */
 export const MATCH_OPTIONS: Record<NetworkName, MatchOptions> = {
-  tram: { maxSnapM: 25, sideBiasM: 1.8, headingWeightM: 20 },
-  road: { maxSnapM: 35, sideBiasM: 0, headingWeightM: 15 },
-  rail: { maxSnapM: 30, sideBiasM: -2.2, headingWeightM: 20 },
+  tram: {
+    maxSnapM: 25,
+    sideBiasM: 1.8,
+    headingWeightM: 20,
+    maxTurnDeg: 60,
+    backwardPenaltyM: 300,
+  },
+  road: {
+    maxSnapM: 35,
+    sideBiasM: 0,
+    headingWeightM: 15,
+    uTurnPenaltyM: 150,
+    backwardPenaltyM: 150,
+  },
+  rail: {
+    maxSnapM: 30,
+    sideBiasM: -2.2,
+    headingWeightM: 20,
+    maxTurnDeg: 45,
+    backwardPenaltyM: 500,
+  },
 };
 
 export interface MatchState {
@@ -560,8 +629,10 @@ export function matchMove(
   x: number,
   y: number,
   opts: MatchOptions,
+  /** Direction the vehicle itself reports, used when there is no previous heading. */
+  hint?: number,
 ): MatchResult | undefined {
-  const heading = prev?.heading;
+  const heading = prev?.heading ?? hint;
   let qx = x;
   let qy = y;
   if (heading !== undefined && opts.sideBiasM !== 0) {
@@ -582,7 +653,7 @@ export function matchMove(
   const crow = Math.hypot(snap.x - prev.x, snap.y - prev.y);
   if (crow < HOLD_M) return keep;
   const from = graph.snap(prev.x, prev.y, opts.maxSnapM, heading, opts.headingWeightM);
-  const path = from && graph.route(from, snap, crow * 2 + 100);
+  const path = from && graph.route(from, snap, crow * 2 + 100, opts, heading);
   if (!path) {
     const direct = headingOf(snap.x - prev.x, snap.y - prev.y) ?? heading;
     return { x: snap.x, y: snap.y, ...withHeading(direct), via: [] };
@@ -735,6 +806,77 @@ export class StreetNetwork {
 export function toLonLatPath(pts: readonly (readonly [number, number])[]): LonLat[] {
   return pts.map(([x, y]) => {
     const [lon, lat] = fromLocalM([x, y]);
-    return [Math.round(lon * 1e6) / 1e6, Math.round(lat * 1e6) / 1e6];
+    return [round6(lon), round6(lat)];
   });
+}
+
+const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+/** Network tiles must be loaded this far around a position before it is matched. */
+const READY_M = 60;
+
+/** One network shared by all transit connectors, so tiles are loaded and kept once. */
+export const STREET_NETWORK = new StreetNetwork();
+
+export interface Placed {
+  lon: number;
+  lat: number;
+  /** Direction of travel. */
+  heading?: number;
+  /** Street or track bearing, for vehicles whose direction isn't known yet. */
+  axis?: number;
+  /** Route since the previous position, excluding both ends. */
+  via?: LonLat[];
+}
+
+/**
+ * Snaps a vehicle to a network and routes from its previous position. A heading the vehicle
+ * reports itself takes precedence over the previous one. Undefined while the network around it
+ * isn't loaded, or when it is too far from any line.
+ */
+export function placeOnNetwork(
+  network: StreetNetwork,
+  name: NetworkName,
+  here: { lon: number; lat: number },
+  prev?: { lon: number; lat: number; heading?: number },
+  reportedHeading?: number,
+): Placed | undefined {
+  const points = prev ? [here, prev] : [here];
+  const ready = points.every((p) =>
+    tilesNear(p.lon, p.lat, READY_M).every(([x, y]) => network.has(x, y)),
+  );
+  if (!ready) return undefined;
+  const [x, y] = toLocalM([here.lon, here.lat]);
+  let state: MatchState | undefined;
+  if (prev) {
+    const [px, py] = toLocalM([prev.lon, prev.lat]);
+    const heading = reportedHeading ?? prev.heading;
+    state = { x: px, y: py, ...withHeading(heading) };
+  }
+  const match = matchMove(network.graphs[name], state, x, y, MATCH_OPTIONS[name], reportedHeading);
+  if (!match) return undefined;
+  const [lon, lat] = fromLocalM([match.x, match.y]);
+  return {
+    lon: round6(lon),
+    lat: round6(lat),
+    ...(match.heading !== undefined && { heading: round1(match.heading) }),
+    ...(match.axis !== undefined && { axis: round1(match.axis) }),
+    ...(match.via.length > 0 && { via: toLonLatPath(match.via) }),
+  };
+}
+
+/** Tiles within `marginM` of weighted points, heaviest first, for `StreetNetwork.ensure`. */
+export function rankTiles(
+  points: readonly { lon: number; lat: number; weight: number }[],
+  marginM: number,
+): [number, number][] {
+  const weights = new Map<string, { tile: [number, number]; weight: number }>();
+  for (const p of points) {
+    for (const tile of tilesNear(p.lon, p.lat, marginM)) {
+      const key = tile.join('/');
+      const entry = weights.get(key);
+      if (entry) entry.weight += p.weight;
+      else weights.set(key, { tile, weight: p.weight });
+    }
+  }
+  return [...weights.values()].sort((a, b) => b.weight - a.weight).map((e) => e.tile);
 }

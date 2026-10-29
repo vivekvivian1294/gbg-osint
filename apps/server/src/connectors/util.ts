@@ -55,6 +55,26 @@ export function parseWktPoint(wkt: string): [number, number] | undefined {
   return Math.abs(lon) <= 180 && Math.abs(lat) <= 90 ? [lon, lat] : undefined;
 }
 
+/** `[lon, lat]` pairs from a WKT `LINESTRING (11.9 57.7, 11.95 57.71, …)`. */
+export function parseWktLine(wkt: string): [number, number][] | undefined {
+  const m = /^LINESTRING\s*\(([^()]*)\)$/i.exec(wkt.trim());
+  if (!m) return undefined;
+  const coords: [number, number][] = [];
+  for (const pair of m[1]!.split(',')) {
+    const [lon, lat] = pair.trim().split(/\s+/).map(Number) as [number, number];
+    if (
+      !Number.isFinite(lon) ||
+      !Number.isFinite(lat) ||
+      Math.abs(lon) > 180 ||
+      Math.abs(lat) > 90
+    ) {
+      return undefined;
+    }
+    coords.push([lon, lat]);
+  }
+  return coords.length >= 2 ? coords : undefined;
+}
+
 export function inGothenburgBbox(lon: number, lat: number): boolean {
   const { west, south, east, north } = GOTHENBURG.bbox;
   return lon >= west && lon <= east && lat >= south && lat <= north;

@@ -64,6 +64,22 @@ const SHIP_PLAYBACK_MS = 20_000;
 const TRANSIT_MODEL_RANGE_M = 3_000;
 /** Street geometry is the centreline; buses keep right, about half a lane from it. */
 const BUS_LANE_OFFSET_M = 1.6;
+const RAIL_LAYER = 'rail';
+const RAIL_CHANNEL = 'transit.rail';
+
+/** On time, a few minutes late, or badly late. */
+function delayColor(e: Entity): string {
+  const delay = num(e.props?.delayMin) ?? 0;
+  return delay >= 15 ? '#f87171' : delay >= 5 ? '#fbbf24' : TRANSIT_FALLBACK.train!;
+}
+
+/** Aviation flight categories, from VFR (good) to LIFR (very low ceiling or visibility). */
+export const FLIGHT_CATEGORY_COLORS: Record<string, string> = {
+  VFR: '#4ade80',
+  MVFR: '#60a5fa',
+  IFR: '#f87171',
+  LIFR: '#e879f9',
+};
 const SHIP_MODEL_RANGE_M = 15_000;
 const CAMERA_MODEL_RANGE_M = 1_500;
 
@@ -176,6 +192,36 @@ export const ENTITY_STYLES: Record<string, EntityStyle> = {
       };
     },
     trackRange: 700,
+  },
+  rail: {
+    icon: 'vehicle',
+    color: delayColor,
+    label: (e) => e.label,
+    labelMaxDistance: 8_000,
+    playbackDelayMs: TRANSIT_PLAYBACK_MS,
+    model: (e) => ({ kind: 'train', accent: delayColor(e), range: TRANSIT_MODEL_RANGE_M }),
+    staleAfterMs: 3 * 60_000,
+    scale: 0.65,
+    detect: (e) => {
+      const delay = num(e.props?.delayMin);
+      const destination = e.props?.destination;
+      return {
+        code: `TRAIN ${String(e.props?.train ?? e.label ?? '')}`.trim(),
+        ...(delay !== undefined && delay > 0
+          ? { tag: `+${delay} min` }
+          : typeof destination === 'string' && { tag: destination }),
+      };
+    },
+    trackRange: 900,
+  },
+  'airport-weather': {
+    icon: 'sensor',
+    color: (e) => FLIGHT_CATEGORY_COLORS[String(e.props?.flightCategory)] ?? '#cbd5e1',
+    label: (e) => e.label,
+    labelMaxDistance: 80_000,
+    staleAfterMs: 90 * 60_000,
+    scale: 0.85,
+    trackRange: 3_000,
   },
   ships: {
     icon: 'ship',
@@ -351,6 +397,8 @@ export function buildMarkers(
   itemsOf: (channel: string) => ChannelItem[],
 ): MarkerSpec[] {
   const markers: MarkerSpec[] = [];
+  // Live Trafikverket positions cover every train, so Västtrafik's few aren't drawn twice.
+  const liveRail = layers.some((l) => l.id === RAIL_LAYER) && itemsOf(RAIL_CHANNEL).some(isEntity);
   for (const layer of layers) {
     for (const channel of layer.channels) {
       const kind = channelKinds.get(channel);
@@ -359,7 +407,9 @@ export function buildMarkers(
         const style = ENTITY_STYLES[layer.id];
         if (!style) continue;
         for (const item of items) {
-          if (isEntity(item)) markers.push(entityMarker(layer, channel, item, style));
+          if (!isEntity(item)) continue;
+          if (liveRail && layer.id === 'transit' && item.kind === 'train') continue;
+          markers.push(entityMarker(layer, channel, item, style));
         }
       } else if (kind === 'events') {
         markers.push(...eventMarkers(layer, channel, items.filter(isEvent)));

@@ -273,6 +273,13 @@ export function App() {
 
   const boardChannels = activeChannels.filter((c) => channelKinds.get(c) === 'departures');
   const boardRows = boardChannels.flatMap(itemsOf).filter(isDeparture);
+  const boardNotes = new Map<string, string>();
+  const landvetter = isActive('airport-weather')
+    ? itemsOf('aviation.metar').find((i) => i.id === 'ESGG')
+    : undefined;
+  if (landvetter && isEntity(landvetter) && typeof landvetter.props?.metar === 'string') {
+    boardNotes.set('Göteborg Landvetter (GOT)', landvetter.props.metar);
+  }
 
   const trackables = trackableEntities(activeLayers, itemsOf);
   const findContact = (ref: TrackRef) => trackables.find((c) => sameRef(c, ref));
@@ -553,6 +560,7 @@ export function App() {
         markers={markers}
         waterways={featureSet('waterways')}
         traffic={featureSet('traffic')}
+        travelTimes={featureSet('travel-times')}
         radar={radarFrames}
         buildings={isActive('buildings')}
         cameraViews={cameraViews}
@@ -649,6 +657,7 @@ export function App() {
               rows={boardRows}
               hasBoardLayers={boardChannels.length > 0}
               aircraftByCallsign={aircraftByCallsign}
+              notes={boardNotes}
               onTrack={track}
             />
           )}

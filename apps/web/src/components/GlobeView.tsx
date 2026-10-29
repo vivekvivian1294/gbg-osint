@@ -21,6 +21,7 @@ import { ToolLayer, type Drawing } from '../engine/tools';
 import { TourPlayer, type Tour, type TourState } from '../engine/tours';
 import { CameraTracker } from '../engine/tracker';
 import { TrafficLayer } from '../engine/traffic';
+import { TravelTimeLayer } from '../engine/travelTimes';
 import { ViewshedLayer, type ViewCamera } from '../engine/viewsheds';
 import { WaterwayLayer } from '../engine/waterways';
 import type { TrackRef } from '../layers/contacts';
@@ -86,6 +87,7 @@ interface GlobeViewProps {
   markers: readonly MarkerSpec[];
   waterways: FeatureSet | null;
   traffic: FeatureSet | null;
+  travelTimes: FeatureSet | null;
   radar: RadarFrames | null;
   buildings: boolean;
   cameraViews: CameraViews | null;
@@ -112,6 +114,7 @@ interface Engine {
   tracker: CameraTracker;
   waterways: WaterwayLayer;
   traffic: TrafficLayer;
+  travelTimes: TravelTimeLayer;
   radar: RadarLayer;
   buildings: BuildingLayer;
   viewsheds: ViewshedLayer;
@@ -127,6 +130,7 @@ export function GlobeView(props: GlobeViewProps) {
     props;
   const waterwaysKey = featureKey(props.waterways);
   const trafficKey = featureKey(props.traffic);
+  const travelTimesKey = featureKey(props.travelTimes);
   const radarKey = props.radar ? props.radar.version : 'off';
   const viewsKey = props.cameraViews ? props.cameraViews.version : 'off';
   const districtsKey = props.districts ? props.districts.key : 'off';
@@ -164,6 +168,7 @@ export function GlobeView(props: GlobeViewProps) {
       tracker: new CameraTracker(globe.scene, renderer),
       waterways: new WaterwayLayer(globe.scene),
       traffic: new TrafficLayer(globe.scene),
+      travelTimes: new TravelTimeLayer(globe.scene),
       radar: new RadarLayer(globe, (state) => latest.current.radarStore.set(state)),
       buildings: new BuildingLayer(globe.scene, globe.creditDisplay),
       viewsheds: new ViewshedLayer(globe.scene),
@@ -256,6 +261,7 @@ export function GlobeView(props: GlobeViewProps) {
       engine.styles.destroy();
       engine.waterways.clear();
       engine.traffic.destroy();
+      engine.travelTimes.destroy();
       engine.radar.clear();
       engine.buildings.destroy();
       engine.viewsheds.clear();
@@ -286,6 +292,14 @@ export function GlobeView(props: GlobeViewProps) {
     if (set) engine.traffic.set(set.layerId, set.channel, set.features);
     else engine.traffic.clear();
   }, [trafficKey]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const set = latest.current.travelTimes;
+    if (set) engine.travelTimes.set(set.layerId, set.channel, set.features);
+    else engine.travelTimes.clear();
+  }, [travelTimesKey]);
 
   useEffect(() => {
     const engine = engineRef.current;

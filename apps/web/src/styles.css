@@ -503,6 +503,13 @@ select option {
   color: var(--danger);
 }
 
+.board-note {
+  margin: 6px 0;
+  font: 11px var(--mono);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 /* Dialogs */
 
 .modal {
@@ -680,6 +687,13 @@ select option {
 .approx-note {
   font-size: 11px;
   color: var(--warn);
+}
+
+.raw-report {
+  margin: 2px 0 6px;
+  font: 11px var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .badge-track {

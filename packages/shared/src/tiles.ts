@@ -42,3 +42,22 @@ export const RouteSchema = z.object({
   line: z.string().min(2).max(200_000),
 });
 export type Route = z.infer<typeof RouteSchema>;
+
+const Airport = z.object({
+  icao: z.string().min(3).max(4),
+  iata: z.string().max(3).optional(),
+  name: z.string().min(1).max(120),
+  city: z.string().max(80).optional(),
+  country: z.string().max(80).optional(),
+});
+
+/** Scheduled origin and destination for an aircraft callsign (adsbdb). */
+export const FlightRouteSchema = z.object({
+  callsign: z.string().min(3).max(8),
+  /** IATA flight number, e.g. `SK1405`. */
+  flight: z.string().max(8).optional(),
+  airline: z.string().max(120).optional(),
+  origin: Airport,
+  destination: Airport,
+});
+export type FlightRoute = z.infer<typeof FlightRouteSchema>;
