@@ -17,6 +17,7 @@ import { getIcon } from './icons';
 import { isPickRef, type MarkerSpec, type PickRef } from './markerSpec';
 import { ModelLayer, type ModelInstance } from './modelLayer';
 import { Playback } from './playback';
+import type { Ground } from './terrain';
 import { ARTICULATION } from './vehicleModels';
 
 interface Position {
@@ -76,10 +77,27 @@ export class MarkerRenderer {
   private readonly tracks = new Map<string, Track>();
   private readonly scratch = new Cartesian3();
 
-  constructor(private readonly scene: Scene) {
+  constructor(
+    private readonly scene: Scene,
+    private readonly ground?: Ground,
+  ) {
     this.billboards = scene.primitives.add(new BillboardCollection({ scene }));
     this.labels = scene.primitives.add(new LabelCollection({ scene }));
     this.models = new ModelLayer(scene, { minimumPixelSize: 20, maximumScale: 6 });
+  }
+
+  /** Re-places markers that aren't moving, after terrain was switched or refined. */
+  refreshHeights(now = performance.now()): void {
+    for (const t of this.tracks.values()) {
+      if (t.playback) continue;
+      const f = t.duration > 0 ? Math.min(1, (now - t.t0) / t.duration) : 1;
+      this.place(t, lerp(t.from, t.to, f));
+    }
+    this.scene.requestRender();
+  }
+
+  private height(pos: Position): number {
+    return this.ground ? this.ground.heightOf(pos.lon, pos.lat, pos.alt) : pos.alt;
   }
 
   sync(specs: readonly MarkerSpec[], now = performance.now(), wallNow = Date.now()): void {
@@ -210,7 +228,11 @@ export class MarkerRenderer {
           instances.push({
             key: sectionKey,
             kind: section.kind,
-            position: Cartesian3.fromDegrees(pose.lon, pose.lat, track.spec.alt),
+            position: Cartesian3.fromDegrees(
+              pose.lon,
+              pose.lat,
+              this.height({ lon: pose.lon, lat: pose.lat, alt: track.spec.alt }),
+            ),
             heading: section.flip ? pose.heading + 180 : pose.heading,
             ...common,
           });
@@ -244,7 +266,7 @@ export class MarkerRenderer {
 
   private create(spec: MarkerSpec, now: number, wallNow: number): void {
     const pos = { lon: spec.lon, lat: spec.lat, alt: spec.alt };
-    const cartesian = Cartesian3.fromDegrees(pos.lon, pos.lat, pos.alt);
+    const cartesian = Cartesian3.fromDegrees(pos.lon, pos.lat, this.height(pos));
     const billboard = this.billboards.add({
       position: cartesian,
       scale: spec.scale ?? 1,
@@ -320,7 +342,13 @@ export class MarkerRenderer {
   }
 
   private place(track: Track, pos: Position): void {
-    const cartesian = Cartesian3.fromDegrees(pos.lon, pos.lat, pos.alt, undefined, this.scratch);
+    const cartesian = Cartesian3.fromDegrees(
+      pos.lon,
+      pos.lat,
+      this.height(pos),
+      undefined,
+      this.scratch,
+    );
     track.billboard.position = cartesian;
     if (track.label) track.label.position = cartesian;
   }

@@ -389,7 +389,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Scene director (`S`, Scenes button):**
   - Four tours: *Göta älv from the sea*, *Inner city orbit*, *Port of Gothenburg* and *Final approach, Landvetter*.
   - Record your own tour from views you add.
-- **Not done (needs keys or costs money):** Google Photorealistic 3D (metered per visitor), Cesium ion terrain and buildings, and Mapillary (token). They stay optional for later.
+- **Not done (needs keys or costs money):** Google Photorealistic 3D (metered per visitor) and Mapillary (token). They stay optional for later. Cesium ion terrain and buildings were added in 6.5.
 - **Findings:**
   - Overpass was over capacity (502) for building queries, so OpenFreeMap is the building source.
   - Basemap changes now replace only the base imagery layer, so overlays such as radar survive.
@@ -487,7 +487,11 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Västtrafik portal:** subscribe to *Trafikstörningar* (currently 403) to get transit disruptions.
 - **Göteborgs Stad APIM key:** Hisingsbron opening status, enabling the *Bridge lift* mission.
 - **NASA FIRMS** (free map key): active fires, which matter in dry Swedish summers.
-- **Cesium ion** (free, non-commercial, optional): real terrain, so ride-along and approaches sit on the actual ground.
+- ✅ **Cesium ion** (`CESIUM_ION_ACCESS_TOKEN`, free, non-commercial): the `3D` button (and `terrain=1` in the link) switches on Cesium World Terrain and Cesium OSM Buildings, which replace the OpenFreeMap buildings while it is on.
+  - Vehicles, ships, pins and labels sit on the real ground (heights sampled from loaded tiles, cached and refreshed as finer tiles arrive); aircraft use reported altitude plus the local geoid height (about 35 m).
+  - Lines and areas (routes, waterways, districts, travel times, viewsheds, tools) are draped on the terrain, and clicks pick the terrain surface.
+  - The token is sent to the browser, so it should have the `assets:read` scope only. Without a token the button is hidden and nothing changes.
+  - Approximate: wind particles float 30 m above sea level, not above the hills.
 
 **6.6 Research spikes**
 - **Göteborgs Stad open data catalogue** (EntryStore API ✓ answers): look for bike counters, parking occupancy, permits and noise data.

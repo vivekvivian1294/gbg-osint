@@ -1,5 +1,6 @@
 import type { Track } from '@gbg-osint/shared';
 import { Cartesian3, Color, Material, PolylineCollection, type Scene } from 'cesium';
+import type { Ground } from './terrain';
 
 /** Longer gaps than this (out of coverage, server restart) break the line instead of bridging it. */
 const MAX_GAP_MS = 30 * 60_000;
@@ -29,22 +30,36 @@ export function trailSegments(
 /** Where the selected or tracked ship, aircraft or train has been in the last 24 hours. */
 export class HistoryTrailLayer {
   private readonly lines: PolylineCollection;
+  private last: Track | undefined;
 
-  constructor(private readonly scene: Scene) {
+  constructor(
+    private readonly scene: Scene,
+    private readonly ground?: Ground,
+  ) {
     this.lines = scene.primitives.add(new PolylineCollection());
+  }
+
+  /** Redraws after terrain was switched or refined. */
+  refreshHeights(): void {
+    if (this.last) this.set(this.last);
   }
 
   set(track: Track): void {
     this.lines.removeAll();
+    this.last = track;
     const material = Material.fromType('PolylineDash', {
       color: Color.fromCssColorString(COLOR).withAlpha(0.85),
       gapColor: Color.TRANSPARENT,
       dashLength: 14,
     });
+    const height = (lon: number, lat: number, alt: number) =>
+      this.ground?.terrain
+        ? this.ground.heightOf(lon, lat, alt) + MIN_HEIGHT_M
+        : Math.max(alt, MIN_HEIGHT_M);
     for (const run of trailSegments(track.points)) {
       this.lines.add({
         positions: run.map(([, lon, lat, alt]) =>
-          Cartesian3.fromDegrees(lon, lat, Math.max(alt, MIN_HEIGHT_M)),
+          Cartesian3.fromDegrees(lon, lat, height(lon, lat, alt)),
         ),
         width: WIDTH_PX,
         material,
@@ -55,6 +70,7 @@ export class HistoryTrailLayer {
 
   clear(): void {
     this.lines.removeAll();
+    this.last = undefined;
     this.scene.requestRender();
   }
 

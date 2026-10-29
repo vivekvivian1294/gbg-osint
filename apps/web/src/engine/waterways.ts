@@ -1,15 +1,6 @@
 import { decodeLine, type Feature } from '@gbg-osint/shared';
-import {
-  ArcType,
-  Cartesian3,
-  Color,
-  GeometryInstance,
-  Material,
-  PolylineGeometry,
-  PolylineMaterialAppearance,
-  Primitive,
-  type Scene,
-} from 'cesium';
+import { Color, Material, type GroundPolylinePrimitive, type Scene } from 'cesium';
+import { drapedMaterialLines, type DrapedLine } from './draped';
 import { LocalFrame, resample, toPath } from './path';
 
 interface FlowClass {
@@ -28,7 +19,6 @@ const CLASSES: Record<string, FlowClass> = {
 const STREAK = new Color(0.88, 0.97, 1.0, 0.95);
 const PIECE_M = 300;
 const VERTEX_SPACING_M = 12;
-const HEIGHT_M = 1.5;
 /** Above this camera height the streaks would be sub-pixel noise. */
 const MAX_CAMERA_HEIGHT_M = 60_000;
 
@@ -87,13 +77,13 @@ export function flowPieces(features: readonly Feature[]): FlowPiece[] {
 }
 
 interface Bucket {
-  primitive: Primitive;
+  primitive: GroundPolylinePrimitive;
   material: Material;
   /** Streak periods per second. */
   speed: number;
 }
 
-/** Animated streaks flowing downstream along rivers, streams and canals. */
+/** Animated streaks flowing downstream along rivers, streams and canals, draped on the ground. */
 export class WaterwayLayer {
   private buckets: Bucket[] = [];
   private visible = false;
@@ -104,7 +94,7 @@ export class WaterwayLayer {
     this.clear();
     const groups = new Map<
       string,
-      { cls: string; repeat: number; length: number; instances: GeometryInstance[] }
+      { cls: string; repeat: number; length: number; lines: DrapedLine[] }
     >();
     for (const piece of flowPieces(features)) {
       const key = `${piece.cls}:${piece.repeat}`;
@@ -112,24 +102,15 @@ export class WaterwayLayer {
         cls: piece.cls,
         repeat: piece.repeat,
         length: 0,
-        instances: [],
+        lines: [],
       };
       group.length += piece.pieceLengthM;
-      group.instances.push(
-        new GeometryInstance({
-          geometry: new PolylineGeometry({
-            positions: piece.coords.map(([lon, lat]) => Cartesian3.fromDegrees(lon, lat, HEIGHT_M)),
-            width: CLASSES[piece.cls]!.widthPx,
-            vertexFormat: PolylineMaterialAppearance.VERTEX_FORMAT,
-            arcType: ArcType.NONE,
-          }),
-        }),
-      );
+      group.lines.push({ coords: piece.coords, width: CLASSES[piece.cls]!.widthPx });
       groups.set(key, group);
     }
     for (const g of groups.values()) {
       const cls = CLASSES[g.cls]!;
-      const meanPiece = g.length / g.instances.length;
+      const meanPiece = g.length / g.lines.length;
       const material = new Material({
         fabric: {
           uniforms: { offset: 0, repeat: g.repeat, color: cls.color, streakColor: STREAK },
@@ -137,13 +118,9 @@ export class WaterwayLayer {
         },
         translucent: true,
       });
-      const primitive = this.scene.primitives.add(
-        new Primitive({
-          geometryInstances: g.instances,
-          appearance: new PolylineMaterialAppearance({ material, translucent: true }),
-          asynchronous: false,
-        }),
-      );
+      const primitive = drapedMaterialLines(g.lines, material, false);
+      if (!primitive) continue;
+      this.scene.primitives.add(primitive);
       this.buckets.push({ primitive, material, speed: (cls.speedMs * g.repeat) / meanPiece });
     }
     this.scene.requestRender();

@@ -8,6 +8,7 @@ import {
   type Scene,
 } from 'cesium';
 import { windVector, type WindField } from '../layers/wind';
+import { GEOID_M, type Ground } from './terrain';
 
 const MAX_PARTICLES = 1_500;
 const PX_PER_PARTICLE = 900;
@@ -59,6 +60,7 @@ export class WindLayer {
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly scene: Scene,
+    private readonly ground?: Ground,
   ) {
     this.ctx = canvas.getContext('2d');
   }
@@ -104,6 +106,8 @@ export class WindLayer {
     const viewWidthM = (extent.east - extent.west) * M_PER_DEG_LON * cosLat;
     const timeScale = viewWidthM / (10 * CROSS_SECONDS);
     const occluder = new EllipsoidalOccluder(Ellipsoid.WGS84, camera.positionWC);
+    // With terrain the particles float above sea level rather than the ellipsoid.
+    const altitude = HEIGHT_M + (this.ground?.terrain ? GEOID_M : 0);
     const paths = SPEED_BANDS.map(() => TRAIL_SHADES.map(() => new Path2D()));
     // One matrix per frame: projecting every trail point through Cesium would be too slow.
     const m = Matrix4.multiply(
@@ -136,7 +140,7 @@ export class WindLayer {
       const pos = Cartesian3.fromDegrees(
         particle.lon,
         particle.lat,
-        HEIGHT_M,
+        altitude,
         Ellipsoid.WGS84,
         this.position,
       );

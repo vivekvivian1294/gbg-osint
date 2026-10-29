@@ -89,7 +89,10 @@ export async function buildApp({
     scheduler,
     history,
     version: VERSION,
-    clientConfig: config.CARTO_API_KEY ? { cartoKey: config.CARTO_API_KEY } : {},
+    clientConfig: {
+      ...(config.CARTO_API_KEY && { cartoKey: config.CARTO_API_KEY }),
+      ...(config.CESIUM_ION_ACCESS_TOKEN && { cesiumIonToken: config.CESIUM_ION_ACCESS_TOKEN }),
+    },
     dataRateLimitPerMinute: config.RATE_LIMIT_PER_MINUTE * 5,
   });
   registerGateway(app, store, { maxConnectionsPerIp: config.WS_MAX_CONNECTIONS_PER_IP });

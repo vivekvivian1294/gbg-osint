@@ -95,10 +95,15 @@ describe('HTTP API', () => {
   it('serves only browser-safe keys in the client config', async () => {
     expect((await (await setup()).app.inject('/api/client-config')).json()).toEqual({});
     await close?.();
-    const { app } = await setup({ CARTO_API_KEY: 'cb1_test-key_123' });
+    const { app } = await setup({
+      CARTO_API_KEY: 'cb1_test-key_123',
+      CESIUM_ION_ACCESS_TOKEN: 'eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJ0ZXN0In0.c2lnbmF0dXJl',
+    });
     expect((await app.inject('/api/client-config')).json()).toEqual({
       cartoKey: 'cb1_test-key_123',
+      cesiumIonToken: 'eyJhbGciOiJIUzI1NiJ9.eyJqdGkiOiJ0ZXN0In0.c2lnbmF0dXJl',
     });
+    expect(() => loadConfig({ CESIUM_ION_ACCESS_TOKEN: 'not a token' })).toThrow();
     expect(() => loadConfig({ CARTO_API_KEY: 'bad key"><script>' })).toThrow();
   });
 

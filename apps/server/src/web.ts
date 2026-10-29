@@ -8,6 +8,8 @@ const TILE_HOSTS = [
   'https://tile.openstreetmap.org',
   'https://*.basemaps.cartocdn.com',
 ];
+/** Cesium ion: terrain and 3D buildings, only used when a token is configured. */
+const ION_HOSTS = ['https://api.cesium.com', 'https://assets.ion.cesium.com'];
 
 /** Content-Security-Policy for the web app; Cesium's WebAssembly needs 'wasm-unsafe-eval'. */
 export const CSP_DIRECTIVES = {
@@ -16,7 +18,7 @@ export const CSP_DIRECTIVES = {
   workerSrc: ["'self'", 'blob:'],
   styleSrc: ["'self'", "'unsafe-inline'"],
   imgSrc: ["'self'", 'data:', 'blob:', ...TILE_HOSTS, 'https://api.trafikinfo.trafikverket.se'],
-  connectSrc: ["'self'", ...TILE_HOSTS],
+  connectSrc: ["'self'", ...TILE_HOSTS, ...ION_HOSTS],
   // Radio streams come from many broadcaster hosts; audio can't run script.
   mediaSrc: ["'self'", 'https:'],
   fontSrc: ["'self'", 'data:'],

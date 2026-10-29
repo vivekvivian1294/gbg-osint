@@ -1,20 +1,18 @@
 import { decodeLine, type Feature } from '@gbg-osint/shared';
-import { Cartesian3, Color, Material, PolylineCollection, type Scene } from 'cesium';
+import { Color, type GroundPolylinePrimitive, type Scene } from 'cesium';
 import { routeColor } from '../layers/markers';
+import { building, drapedLines, type DrapedLine } from './draped';
 import type { PickRef } from './markerSpec';
 
-const HEIGHT_M = 3;
 const WIDTH: Record<string, number> = { tram: 3.5, train: 3.5, ferry: 3, bus: 1.6 };
 /** Buses are drawn under rail and ferries and fainter, so the tram network stands out. */
 const DRAW_ORDER = ['bus', 'ferry', 'train', 'tram'];
 
 /** Public transport routes from GTFS, in each line's colour when the live vehicles give one. */
 export class TransitRouteLayer {
-  private readonly lines: PolylineCollection;
+  private primitives: GroundPolylinePrimitive[] = [];
 
-  constructor(private readonly scene: Scene) {
-    this.lines = scene.primitives.add(new PolylineCollection());
-  }
+  constructor(private readonly scene: Scene) {}
 
   set(
     layerId: string,
@@ -22,34 +20,47 @@ export class TransitRouteLayer {
     features: readonly Feature[],
     lineColors: ReadonlyMap<string, string>,
   ): void {
-    this.lines.removeAll();
-    const rank = (f: Feature) => DRAW_ORDER.indexOf(String(f.props?.mode));
-    for (const f of [...features].sort((a, b) => rank(a) - rank(b))) {
+    this.clear();
+    const byMode = new Map<string, DrapedLine[]>();
+    for (const f of features) {
       if (f.kind !== 'transit-route') continue;
       const coords = decodeLine(f.line);
       if (coords.length < 2) continue;
       const mode = String(f.props?.mode);
-      const pick: PickRef = { layerId, channel, ids: [f.id] };
-      this.lines.add({
-        positions: coords.map(([lon, lat]) => Cartesian3.fromDegrees(lon, lat, HEIGHT_M)),
+      const lines = byMode.get(mode) ?? [];
+      lines.push({
+        coords,
         width: WIDTH[mode] ?? 2,
-        material: Material.fromType('Color', {
-          color: Color.fromCssColorString(routeColor(f, lineColors)).withAlpha(
-            mode === 'bus' ? 0.55 : 0.9,
-          ),
-        }),
-        id: pick,
+        color: Color.fromCssColorString(routeColor(f, lineColors)).withAlpha(
+          mode === 'bus' ? 0.55 : 0.9,
+        ),
+        id: { layerId, channel, ids: [f.id] } satisfies PickRef,
       });
+      byMode.set(mode, lines);
+    }
+    // Later primitives draw on top, so trams end up above buses.
+    const rank = (mode: string) => DRAW_ORDER.indexOf(mode);
+    for (const [, lines] of [...byMode].sort((a, b) => rank(a[0]) - rank(b[0]))) {
+      const primitive = drapedLines(lines);
+      if (primitive) this.primitives.push(this.scene.primitives.add(primitive));
     }
     this.scene.requestRender();
   }
 
+  /** True while the lines are still being built. */
+  update(): boolean {
+    return building(...this.primitives);
+  }
+
   clear(): void {
-    this.lines.removeAll();
-    this.scene.requestRender();
+    if (!this.scene.isDestroyed()) {
+      for (const p of this.primitives) this.scene.primitives.remove(p);
+      this.scene.requestRender();
+    }
+    this.primitives = [];
   }
 
   destroy(): void {
-    if (!this.scene.isDestroyed()) this.scene.primitives.remove(this.lines);
+    this.clear();
   }
 }

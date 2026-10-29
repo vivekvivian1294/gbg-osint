@@ -3,6 +3,7 @@ import { Cartesian3, type Scene } from 'cesium';
 import type { PickRef } from './markerSpec';
 import { ModelLayer, type ModelInstance } from './modelLayer';
 import { LocalFrame, pointAlong, toPath, type PathPoint } from './path';
+import type { Ground } from './terrain';
 
 const CAR_COLORS = [
   '#f2f2f0',
@@ -123,7 +124,10 @@ export class TrafficLayer {
   private channel = '';
   private layerId = '';
 
-  constructor(private readonly scene: Scene) {
+  constructor(
+    private readonly scene: Scene,
+    private readonly ground?: Ground,
+  ) {
     this.models = new ModelLayer(scene);
   }
 
@@ -143,7 +147,11 @@ export class TrafficLayer {
       const pick: PickRef = { layerId: this.layerId, channel: this.channel, ids: [c.id] };
       for (const car of carsAt(c, t)) {
         if (car.scale <= 0) continue;
-        const position = Cartesian3.fromDegrees(car.lon, car.lat, 0);
+        const position = Cartesian3.fromDegrees(
+          car.lon,
+          car.lat,
+          this.ground?.surface(car.lon, car.lat) ?? 0,
+        );
         const dist = Cartesian3.distance(camera, position);
         if (dist > RANGE_M) continue;
         candidates.push({

@@ -3,21 +3,16 @@ import {
   Cartesian2,
   Cartesian3,
   Color,
-  ColorGeometryInstanceAttribute,
-  GeometryInstance,
   LabelCollection,
   LabelStyle,
-  Material,
-  PerInstanceColorAppearance,
   PointPrimitiveCollection,
-  PolygonGeometry,
-  PolygonHierarchy,
-  PolylineGeometry,
-  PolylineMaterialAppearance,
-  Primitive,
   VerticalOrigin,
+  type GroundPolylinePrimitive,
+  type GroundPrimitive,
   type Scene,
 } from 'cesium';
+import { drapedAreas, drapedLines } from './draped';
+import type { Ground } from './terrain';
 
 /** What the measure, pin, route and watch tools have drawn, plus the "What's here?" point. */
 export interface Drawing {
@@ -40,63 +35,37 @@ const SPOT = Color.fromCssColorString('#ffffff');
 const ON_TOP = Number.POSITIVE_INFINITY;
 const LABEL_OFFSET = new Cartesian2(0, -14);
 
-const positions = (points: readonly LonLat[]) =>
-  Cartesian3.fromDegreesArrayHeights(points.flatMap(([lon, lat]) => [lon, lat, LIFT_M]));
-
-/** Lines stay visible behind buildings, drawn fainter there. */
-function line(points: readonly LonLat[], color: Color, width: number): Primitive {
-  return new Primitive({
-    geometryInstances: new GeometryInstance({
-      geometry: new PolylineGeometry({
-        positions: positions(points),
-        width,
-        vertexFormat: PolylineMaterialAppearance.VERTEX_FORMAT,
-      }),
-    }),
-    appearance: new PolylineMaterialAppearance({ material: Material.fromType('Color', { color }) }),
-    depthFailAppearance: new PolylineMaterialAppearance({
-      material: Material.fromType('Color', { color: color.withAlpha(0.35) }),
-    }),
-    asynchronous: false,
-    allowPicking: false,
-  });
-}
-
-function fill(points: readonly LonLat[], color: Color): Primitive {
-  return new Primitive({
-    geometryInstances: new GeometryInstance({
-      geometry: new PolygonGeometry({
-        polygonHierarchy: new PolygonHierarchy(positions(points)),
-        height: LIFT_M,
-        vertexFormat: PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-      }),
-      attributes: { color: ColorGeometryInstanceAttribute.fromColor(color) },
-    }),
-    appearance: new PerInstanceColorAppearance({ flat: true, translucent: true }),
-    asynchronous: false,
-    allowPicking: false,
-  });
-}
-
 const northernmost = (ring: readonly LonLat[]): LonLat =>
   ring.reduce((top, p) => (p[1] > top[1] ? p : top), ring[0]!);
 
-/** Draws measurements, pins, routes and watch areas on top of the map. */
+/** Draws measurements, pins, routes and watch areas on the ground. */
 export class ToolLayer {
   private readonly points: PointPrimitiveCollection;
   private readonly labels: LabelCollection;
-  private primitives: Primitive[] = [];
+  private primitives: (GroundPrimitive | GroundPolylinePrimitive)[] = [];
+  private last: Drawing | undefined;
 
-  constructor(private readonly scene: Scene) {
+  constructor(
+    private readonly scene: Scene,
+    private readonly ground?: Ground,
+  ) {
     this.points = scene.primitives.add(new PointPrimitiveCollection());
     this.labels = scene.primitives.add(new LabelCollection({ scene }));
   }
 
+  /** Re-places the points after terrain was switched or refined. */
+  refreshHeights(): void {
+    if (this.last) this.set(this.last);
+  }
+
   set(d: Drawing): void {
     this.clear();
+    this.last = d;
+    const at = ([lon, lat]: LonLat) =>
+      Cartesian3.fromDegrees(lon, lat, (this.ground?.surface(lon, lat) ?? 0) + LIFT_M);
     const point = (p: LonLat, color: Color, size: number) =>
       this.points.add({
-        position: Cartesian3.fromDegrees(p[0], p[1], LIFT_M),
+        position: at(p),
         color,
         pixelSize: size,
         outlineColor: Color.BLACK,
@@ -105,7 +74,7 @@ export class ToolLayer {
       });
     const label = (p: LonLat, text: string) =>
       this.labels.add({
-        position: Cartesian3.fromDegrees(p[0], p[1], LIFT_M),
+        position: at(p),
         text,
         font: '12px ui-monospace, Menlo, monospace',
         style: LabelStyle.FILL_AND_OUTLINE,
@@ -115,20 +84,24 @@ export class ToolLayer {
         verticalOrigin: VerticalOrigin.BOTTOM,
         disableDepthTestDistance: ON_TOP,
       });
+    const fill = (ring: readonly LonLat[], color: Color) =>
+      this.add(drapedAreas([{ rings: [ring], color }], false));
+    const line = (coords: readonly LonLat[], color: Color, width: number, loop = false) =>
+      this.add(drapedLines([{ coords, color, width, loop }], false));
 
-    if (d.measure.length >= 3) this.add(fill(d.measure, MEASURE.withAlpha(0.15)));
-    if (d.measure.length >= 2) this.add(line(d.measure, MEASURE, 3));
+    if (d.measure.length >= 3) fill(d.measure, MEASURE.withAlpha(0.15));
+    if (d.measure.length >= 2) line(d.measure, MEASURE, 3);
     d.measure.forEach((p) => point(p, MEASURE, 8));
     const last = d.measure.at(-1);
     if (last && d.measureLabel) label(last, d.measureLabel);
 
     for (const area of d.watchAreas) {
-      this.add(fill(area.ring, WATCH.withAlpha(0.08)));
-      this.add(line([...area.ring, area.ring[0]!], WATCH, 2));
+      fill(area.ring, WATCH.withAlpha(0.08));
+      line(area.ring, WATCH, 2, true);
       label(northernmost(area.ring), area.name);
     }
-    if (d.watchDraft.length >= 3) this.add(fill(d.watchDraft, WATCH.withAlpha(0.15)));
-    if (d.watchDraft.length >= 2) this.add(line(d.watchDraft, WATCH, 3));
+    if (d.watchDraft.length >= 3) fill(d.watchDraft, WATCH.withAlpha(0.15));
+    if (d.watchDraft.length >= 2) line(d.watchDraft, WATCH, 3);
     d.watchDraft.forEach((p) => point(p, WATCH, 8));
 
     d.pins.forEach((p, i) => {
@@ -136,7 +109,7 @@ export class ToolLayer {
       label(p, `P${i + 1}`);
     });
 
-    if (d.routeLine.length >= 2) this.add(line(d.routeLine, ROUTE, 5));
+    if (d.routeLine.length >= 2) line(d.routeLine, ROUTE, 5);
     d.routeEnds.forEach((p, i) => {
       point(p, ROUTE, 12);
       label(p, i === 0 ? 'A' : 'B');
@@ -163,7 +136,7 @@ export class ToolLayer {
     this.scene.primitives.remove(this.labels);
   }
 
-  private add(p: Primitive): void {
-    this.primitives.push(this.scene.primitives.add(p));
+  private add(p: GroundPrimitive | GroundPolylinePrimitive | undefined): void {
+    if (p) this.primitives.push(this.scene.primitives.add(p));
   }
 }

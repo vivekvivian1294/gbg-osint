@@ -140,6 +140,7 @@ export function App() {
   const [style, setStyle] = useState<StyleId>(initial.style ?? 'normal');
   const [hud, setHud] = useState(initial.hud ?? false);
   const [detection, setDetection] = useState(initial.detection ?? false);
+  const [terrain, setTerrain] = useState(initial.terrain ?? false);
   const [density, setDensity] = useState(1);
   const [enabled, setEnabled] = useState<ReadonlySet<string>>(() =>
     enabledFrom(initial.layers ?? DEFAULT_LAYERS),
@@ -263,9 +264,10 @@ export function App() {
       style,
       hud,
       detection,
+      terrain,
       ...(tracked && { track: tracked, ride }),
     });
-  }, [camera, basemap, enabled, style, hud, detection, tracked, ride]);
+  }, [camera, basemap, enabled, style, hud, detection, terrain, tracked, ride]);
 
   // Derived from live data on every render; useLive re-renders this component on updates.
   const itemsOf = (channel: string): ChannelItem[] =>
@@ -565,6 +567,7 @@ export function App() {
       setStyle(s.style ?? 'normal');
       setHud(s.hud ?? false);
       setDetection(s.detection ?? false);
+      setTerrain(s.terrain ?? false);
       setSelection(null);
       if (s.track) {
         track(s.track);
@@ -695,6 +698,7 @@ export function App() {
         trail={trail ?? null}
         wind={wind}
         satellite={isActive('satellite')}
+        terrain={terrain}
         radar={radarFrames}
         buildings={isActive('buildings')}
         cameraViews={cameraViews}
@@ -738,6 +742,8 @@ export function App() {
         onStyleChange={setStyle}
         onToggleHud={() => setHud((v) => !v)}
         onToggleDetection={() => setDetection((v) => !v)}
+        terrain={terrain}
+        onToggleTerrain={() => setTerrain((v) => !v)}
         onToggleLayers={() => setPanels((p) => ({ ...p, layers: !p.layers }))}
         onToggleRight={toggleRight}
         onToggleTools={() => {

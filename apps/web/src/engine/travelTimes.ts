@@ -1,9 +1,9 @@
 import { decodeLine, type Feature } from '@gbg-osint/shared';
-import { Cartesian3, Color, Material, PolylineCollection, type Scene } from 'cesium';
+import { Color, Material, type GroundPolylinePrimitive, type Scene } from 'cesium';
+import { building, drapedMaterialLines, type DrapedLine } from './draped';
 import type { PickRef } from './markerSpec';
 import { LocalFrame } from './path';
 
-const HEIGHT_M = 4;
 const WIDTH_PX = 7;
 /** Each direction is drawn this far to its right, so both carriageways stay visible. */
 const OFFSET_M = 6;
@@ -56,43 +56,54 @@ export function offsetLine(
   });
 }
 
-/** Measured road stretches as coloured, clickable lines. */
+/** Measured road stretches as coloured, clickable lines draped on the ground. */
 export class TravelTimeLayer {
-  private readonly lines: PolylineCollection;
+  private primitives: GroundPolylinePrimitive[] = [];
 
-  constructor(private readonly scene: Scene) {
-    this.lines = scene.primitives.add(new PolylineCollection());
-  }
+  constructor(private readonly scene: Scene) {}
 
   set(layerId: string, channel: string, features: readonly Feature[]): void {
-    this.lines.removeAll();
+    this.clear();
+    const byColor = new Map<string, DrapedLine[]>();
     for (const f of features) {
       if (f.kind !== 'travel-time') continue;
       const coords = decodeLine(f.line);
       if (coords.length < 2) continue;
-      const pick: PickRef = { layerId, channel, ids: [f.id] };
-      this.lines.add({
-        positions: offsetLine(coords, OFFSET_M).map(([lon, lat]) =>
-          Cartesian3.fromDegrees(lon, lat, HEIGHT_M),
-        ),
+      const color = travelTimeColor(f.props);
+      const lines = byColor.get(color) ?? [];
+      lines.push({
+        coords: offsetLine(coords, OFFSET_M),
         width: WIDTH_PX,
-        material: Material.fromType('PolylineOutline', {
-          color: Color.fromCssColorString(travelTimeColor(f.props)),
-          outlineColor: Color.BLACK.withAlpha(0.7),
-          outlineWidth: 2,
-        }),
-        id: pick,
+        id: { layerId, channel, ids: [f.id] } satisfies PickRef,
       });
+      byColor.set(color, lines);
+    }
+    for (const [color, lines] of byColor) {
+      const material = Material.fromType('PolylineOutline', {
+        color: Color.fromCssColorString(color),
+        outlineColor: Color.BLACK.withAlpha(0.7),
+        outlineWidth: 2,
+      });
+      const primitive = drapedMaterialLines(lines, material);
+      if (primitive) this.primitives.push(this.scene.primitives.add(primitive));
     }
     this.scene.requestRender();
   }
 
+  /** True while the lines are still being built. */
+  update(): boolean {
+    return building(...this.primitives);
+  }
+
   clear(): void {
-    this.lines.removeAll();
-    this.scene.requestRender();
+    if (!this.scene.isDestroyed()) {
+      for (const p of this.primitives) this.scene.primitives.remove(p);
+      this.scene.requestRender();
+    }
+    this.primitives = [];
   }
 
   destroy(): void {
-    if (!this.scene.isDestroyed()) this.scene.primitives.remove(this.lines);
+    this.clear();
   }
 }

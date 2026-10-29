@@ -32,7 +32,15 @@ export const HealthSchema = z.object({
 export type Health = z.infer<typeof HealthSchema>;
 
 export const PublicKey = z.string().regex(/^[\w-]{8,200}$/);
+/** Cesium ion access tokens are JWTs. */
+export const IonToken = z
+  .string()
+  .max(4000)
+  .regex(/^[\w-]+\.[\w-]+\.[\w-]+$/);
 
 /** Keys that are public by design (used in browser tile URLs); restrict them by domain. */
-export const ClientConfigSchema = z.object({ cartoKey: PublicKey.optional() });
+export const ClientConfigSchema = z.object({
+  cartoKey: PublicKey.optional(),
+  cesiumIonToken: IonToken.optional(),
+});
 export type ClientConfig = z.infer<typeof ClientConfigSchema>;

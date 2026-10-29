@@ -1,34 +1,17 @@
-import {
-  Cartesian3,
-  Color,
-  ColorGeometryInstanceAttribute,
-  GeometryInstance,
-  PerInstanceColorAppearance,
-  PolygonGeometry,
-  PolygonHierarchy,
-  PolygonOutlineGeometry,
-  Primitive,
-  type Scene,
-} from 'cesium';
+import { Color, type GroundPolylinePrimitive, type GroundPrimitive, type Scene } from 'cesium';
 import type { DistrictShape } from '../layers/districts';
+import { building, drapedAreas, drapedLines, type DrapedArea, type DrapedLine } from './draped';
 import type { PickRef } from './markerSpec';
 
 const FILL_ALPHA = 0.55;
 const NO_DATA = Color.fromCssColorString('#64748b').withAlpha(0.25);
 const EDGE = Color.WHITE.withAlpha(0.35);
-
-const hierarchy = (rings: readonly (readonly [number, number])[][]) => {
-  const [outer, ...holes] = rings.map((r) => Cartesian3.fromDegreesArray(r.flat()));
-  return new PolygonHierarchy(
-    outer!,
-    holes.map((h) => new PolygonHierarchy(h)),
-  );
-};
+const EDGE_WIDTH = 1.5;
 
 /** Choropleth of statistical districts; clicking a district selects it. */
 export class DistrictLayer {
-  private fill: Primitive | undefined;
-  private edge: Primitive | undefined;
+  private fill: GroundPrimitive | undefined;
+  private edge: GroundPolylinePrimitive | undefined;
   private key = '';
 
   constructor(private readonly scene: Scene) {}
@@ -37,51 +20,30 @@ export class DistrictLayer {
     if (key === this.key) return;
     this.clear();
     this.key = key;
-    const fills: GeometryInstance[] = [];
-    const edges: GeometryInstance[] = [];
+    const fills: DrapedArea[] = [];
+    const edges: DrapedLine[] = [];
     for (const shape of shapes) {
-      const color = ColorGeometryInstanceAttribute.fromColor(
-        shape.color ? Color.fromCssColorString(shape.color).withAlpha(FILL_ALPHA) : NO_DATA,
-      );
+      const color = shape.color
+        ? Color.fromCssColorString(shape.color).withAlpha(FILL_ALPHA)
+        : NO_DATA;
       for (const rings of shape.polygons) {
-        const polygonHierarchy = hierarchy(rings);
-        fills.push(
-          new GeometryInstance({
-            id: pickOf(shape.id),
-            geometry: new PolygonGeometry({
-              polygonHierarchy,
-              vertexFormat: PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-            }),
-            attributes: { color },
-          }),
-        );
-        edges.push(
-          new GeometryInstance({
-            geometry: new PolygonOutlineGeometry({ polygonHierarchy }),
-            attributes: { color: ColorGeometryInstanceAttribute.fromColor(EDGE) },
-          }),
-        );
+        fills.push({ rings, color, id: pickOf(shape.id) });
+        for (const ring of rings) {
+          edges.push({ coords: ring, width: EDGE_WIDTH, color: EDGE, loop: true });
+        }
       }
     }
-    if (fills.length === 0) return;
-    const appearance = () => new PerInstanceColorAppearance({ flat: true, translucent: true });
-    this.fill = this.scene.primitives.add(
-      new Primitive({ geometryInstances: fills, appearance: appearance(), asynchronous: true }),
-    );
-    this.edge = this.scene.primitives.add(
-      new Primitive({
-        geometryInstances: edges,
-        appearance: appearance(),
-        asynchronous: true,
-        allowPicking: false,
-      }),
-    );
+    const fill = drapedAreas(fills);
+    if (!fill) return;
+    this.fill = this.scene.primitives.add(fill);
+    const edge = drapedLines(edges, false);
+    if (edge) this.edge = this.scene.primitives.add(edge);
     this.scene.requestRender();
   }
 
   /** True while the geometry is still being built. */
   update(): boolean {
-    return Boolean((this.fill && !this.fill.ready) || (this.edge && !this.edge.ready));
+    return building(this.fill, this.edge);
   }
 
   clear(): void {

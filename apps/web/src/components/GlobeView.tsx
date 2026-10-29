@@ -19,6 +19,7 @@ import { MarkerRenderer } from '../engine/markers';
 import { Overlay, type OverlayStats } from '../engine/overlay';
 import { RadarLayer, type RadarState } from '../engine/radar';
 import { SatelliteLayer } from '../engine/satellite';
+import { Ground, TerrainController } from '../engine/terrain';
 import { StyleController } from '../engine/styles';
 import { ToolLayer, type Drawing } from '../engine/tools';
 import { TourPlayer, type Tour, type TourState } from '../engine/tours';
@@ -86,7 +87,11 @@ const LONG_PRESS_MS = 600;
 const LONG_PRESS_SLOP_PX = 10;
 
 function groundAt(globe: CesiumWidget, position: Cartesian2): LonLat | null {
-  const ground = globe.camera.pickEllipsoid(position);
+  const { scene, camera } = globe;
+  const ray = camera.getPickRay(position);
+  // With terrain the click lands on the hills, not on the ellipsoid beneath them.
+  const ground =
+    (ray && scene.globe.pick(ray, scene)) ?? camera.pickEllipsoid(position) ?? undefined;
   if (!ground) return null;
   const c = Cartographic.fromCartesian(ground);
   return [CesiumMath.toDegrees(c.longitude), CesiumMath.toDegrees(c.latitude)];
@@ -118,6 +123,8 @@ interface GlobeViewProps {
   wind: WindField | null;
   /** Yesterday's satellite image over the basemap. */
   satellite: boolean;
+  /** Real terrain and 3D buildings from Cesium ion (needs `basemapKeys.cesiumIonToken`). */
+  terrain: boolean;
   radar: RadarFrames | null;
   buildings: boolean;
   cameraViews: CameraViews | null;
@@ -153,6 +160,8 @@ interface Engine {
   trail: HistoryTrailLayer;
   wind: WindLayer;
   satellite: SatelliteLayer;
+  ground: Ground;
+  terrain: TerrainController;
   radar: RadarLayer;
   buildings: BuildingLayer;
   viewsheds: ViewshedLayer;
@@ -203,29 +212,38 @@ export function GlobeView(props: GlobeViewProps) {
     );
     currentBasemap.current = initial.current.basemap;
     setCameraState(globe, initial.current.camera);
-    const renderer = new MarkerRenderer(globe.scene);
+    const ground = new Ground(globe);
+    const renderer = new MarkerRenderer(globe.scene, ground);
     const engine: Engine = {
       globe,
+      ground,
       renderer,
       styles: new StyleController(globe.scene),
       overlay: new Overlay(canvas, globe.scene, renderer),
       tracker: new CameraTracker(globe.scene, renderer),
       waterways: new WaterwayLayer(globe.scene),
-      traffic: new TrafficLayer(globe.scene),
+      traffic: new TrafficLayer(globe.scene, ground),
       travelTimes: new TravelTimeLayer(globe.scene),
       transitRoutes: new TransitRouteLayer(globe.scene),
-      trail: new HistoryTrailLayer(globe.scene),
-      wind: new WindLayer(windCanvas, globe.scene),
+      trail: new HistoryTrailLayer(globe.scene, ground),
+      wind: new WindLayer(windCanvas, globe.scene, ground),
       satellite: new SatelliteLayer(globe),
       radar: new RadarLayer(globe, (state) => latest.current.radarStore.set(state)),
       buildings: new BuildingLayer(globe.scene, globe.creditDisplay),
       viewsheds: new ViewshedLayer(globe.scene),
       tours: new TourPlayer((state) => latest.current.tourStore.set(state)),
       districts: new DistrictLayer(globe.scene),
-      tools: new ToolLayer(globe.scene),
+      tools: new ToolLayer(globe.scene, ground),
+      terrain: new TerrainController(globe, ground, () => refreshHeights()),
     };
     engineRef.current = engine;
     latest.current.onCentreSettled(viewCentre(globe));
+    const refreshHeights = () => {
+      renderer.refreshHeights();
+      engine.tools.refreshHeights();
+      engine.trail.refreshHeights();
+      engine.buildings.setEnabled(latest.current.buildings && !ground.terrain);
+    };
 
     const { camera, scene } = globe;
     camera.percentageChanged = 0.001;
@@ -245,6 +263,10 @@ export function GlobeView(props: GlobeViewProps) {
           lastStats = now;
           latest.current.statsStore.set(stats);
         }
+      }),
+      // Finer terrain tiles change the surface a little: re-seat what sits on it.
+      scene.globe.tileLoadProgressEvent.addEventListener((queued: number) => {
+        if (queued === 0 && ground.refresh(performance.now())) refreshHeights();
       }),
     ];
 
@@ -313,6 +335,7 @@ export function GlobeView(props: GlobeViewProps) {
       }
       const building = engine.buildings.update();
       const districting = engine.districts.update();
+      const draping = engine.travelTimes.update() || engine.transitRoutes.update();
       engine.wind.update(now);
       const tracking = engine.tracker.update();
       if (tracking === 'lost') latest.current.onTrackLost();
@@ -323,6 +346,7 @@ export function GlobeView(props: GlobeViewProps) {
         raining ||
         building ||
         districting ||
+        draping ||
         tourCamera ||
         tracking === 'following' ||
         engine.styles.animated
@@ -354,6 +378,7 @@ export function GlobeView(props: GlobeViewProps) {
       engine.trail.destroy();
       engine.wind.set(null);
       engine.satellite.hide();
+      engine.terrain.destroy();
       engine.radar.clear();
       engine.buildings.destroy();
       engine.viewsheds.clear();
@@ -428,9 +453,14 @@ export function GlobeView(props: GlobeViewProps) {
     else engine.radar.clear();
   }, [radarKey]);
 
+  // With terrain, Cesium OSM Buildings (terrain-aware) replace the flat-based OpenFreeMap ones.
+  const ionToken = props.basemapKeys.cesiumIonToken;
   useEffect(() => {
-    engineRef.current?.buildings.setEnabled(buildings);
-  }, [buildings]);
+    const engine = engineRef.current;
+    if (!engine) return;
+    engine.buildings.setEnabled(buildings && !(props.terrain && ionToken));
+    void engine.terrain.set(props.terrain, ionToken, buildings);
+  }, [buildings, props.terrain, ionToken]);
 
   useEffect(() => {
     const engine = engineRef.current;

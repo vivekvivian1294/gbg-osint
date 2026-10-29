@@ -10,6 +10,8 @@ export interface UrlState {
   style?: StyleId;
   hud?: boolean;
   detection?: boolean;
+  /** Real terrain (needs a Cesium ion token). */
+  terrain?: boolean;
   track?: TrackRef;
   /** Ride along with the tracked object (cab view). */
   ride?: boolean;
@@ -44,6 +46,7 @@ export function parseHash(hash: string): UrlState {
   if (style && (STYLE_IDS as readonly string[]).includes(style)) state.style = style as StyleId;
   if (params.get('hud') === '1') state.hud = true;
   if (params.get('det') === '1') state.detection = true;
+  if (params.get('terrain') === '1') state.terrain = true;
 
   const track = parseTrack(params.get('track'));
   if (track) {
@@ -92,6 +95,7 @@ export function serializeHash(state: UrlState): string {
   if (state.style && state.style !== 'normal') parts.push(`style=${state.style}`);
   if (state.hud) parts.push('hud=1');
   if (state.detection) parts.push('det=1');
+  if (state.terrain) parts.push('terrain=1');
   if (state.track) {
     parts.push(`track=${state.track.layerId}:${encodeURIComponent(state.track.id)}`);
     if (state.ride) parts.push('ride=1');

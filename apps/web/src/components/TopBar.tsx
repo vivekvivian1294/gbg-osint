@@ -14,6 +14,7 @@ interface TopBarProps {
   style: StyleId;
   hud: boolean;
   detection: boolean;
+  terrain: boolean;
   density: number;
   connection: ConnectionState;
   layersOpen: boolean;
@@ -27,6 +28,7 @@ interface TopBarProps {
   onStyleChange(id: StyleId): void;
   onToggleHud(): void;
   onToggleDetection(): void;
+  onToggleTerrain(): void;
   onToggleLayers(): void;
   onToggleRight(panel: RightPanel): void;
   onToggleTools(): void;
@@ -138,6 +140,16 @@ export function TopBar(props: TopBarProps) {
         >
           DET{props.detection && props.density < 1 ? ` ${Math.round(props.density * 100)}%` : ''}
         </button>
+        {props.clientKeys.cesiumIonToken && (
+          <button
+            type="button"
+            aria-pressed={props.terrain}
+            onClick={props.onToggleTerrain}
+            title="3D terrain and buildings (Cesium ion)"
+          >
+            3D
+          </button>
+        )}
         <button type="button" onClick={props.onOpenMissions} title="Missions (M)">
           Missions
         </button>

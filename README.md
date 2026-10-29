@@ -38,8 +38,9 @@ Everything keyless works out of the box. Keys unlock more layers. Copy `.env.exa
 | `SWEDAVIA_FLIGHTINFO_KEY`                          | Landvetter departures and arrivals                                             | [apideveloper.swedavia.se](https://apideveloper.swedavia.se/) |
 | `CARTO_API_KEY`                                    | Dark Matter and Voyager basemaps                                               | [carto.com](https://carto.com/)                               |
 | `TRAFIKLAB_GTFS_REGIONAL_KEY`                      | Public transport routes and stops (GTFS Regional Static)                       | [trafiklab.se](https://www.trafiklab.se/)                     |
+| `CESIUM_ION_ACCESS_TOKEN`                          | 3D terrain and buildings (the `3D` button)                                     | [ion.cesium.com](https://ion.cesium.com/)                     |
 
-Keys stay on your machine: the server uses them, and only the CARTO basemap key is sent to your browser. Each layer says which key it needs instead of failing silently.
+Keys stay on your machine: the server uses them, and only the CARTO key and the Cesium ion token are sent to your browser (give the ion token the `assets:read` scope only). Each layer says which key it needs instead of failing silently.
 
 ## Using it
 

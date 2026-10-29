@@ -1,15 +1,5 @@
-import {
-  Cartesian3,
-  Color,
-  ColorGeometryInstanceAttribute,
-  GeometryInstance,
-  PerInstanceColorAppearance,
-  PolygonGeometry,
-  PolygonHierarchy,
-  PolygonOutlineGeometry,
-  Primitive,
-  type Scene,
-} from 'cesium';
+import { Color, type GroundPolylinePrimitive, type GroundPrimitive, type Scene } from 'cesium';
+import { drapedAreas, drapedLines } from './draped';
 
 /** Assumed coverage: the published direction ± half the field of view, out to a typical range. */
 export const VIEW_HALF_ANGLE_DEG = 30;
@@ -47,8 +37,8 @@ export function viewWedge(
 
 /** Estimated viewing areas of road cameras, drawn as translucent wedges on the ground. */
 export class ViewshedLayer {
-  private fill: Primitive | undefined;
-  private edge: Primitive | undefined;
+  private fill: GroundPrimitive | undefined;
+  private edge: GroundPolylinePrimitive | undefined;
   private key = '';
 
   constructor(private readonly scene: Scene) {}
@@ -59,40 +49,22 @@ export class ViewshedLayer {
     this.clear();
     this.key = key;
     if (cameras.length === 0) return;
-    const hierarchies = cameras.map(
-      (c) => new PolygonHierarchy(Cartesian3.fromDegreesArray(viewWedge(c))),
+    const wedges = cameras.map((c) => {
+      const flat = viewWedge(c);
+      const ring: [number, number][] = [];
+      for (let i = 0; i + 1 < flat.length; i += 2) ring.push([flat[i]!, flat[i + 1]!]);
+      return ring;
+    });
+    const fill = drapedAreas(
+      wedges.map((ring) => ({ rings: [ring], color: FILL })),
+      false,
     );
-    this.fill = this.scene.primitives.add(
-      new Primitive({
-        geometryInstances: hierarchies.map(
-          (polygonHierarchy) =>
-            new GeometryInstance({
-              geometry: new PolygonGeometry({
-                polygonHierarchy,
-                vertexFormat: PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-              }),
-              attributes: { color: ColorGeometryInstanceAttribute.fromColor(FILL) },
-            }),
-        ),
-        appearance: new PerInstanceColorAppearance({ flat: true, translucent: true }),
-        allowPicking: false,
-        asynchronous: false,
-      }),
+    if (fill) this.fill = this.scene.primitives.add(fill);
+    const edge = drapedLines(
+      wedges.map((ring) => ({ coords: ring, width: 1.5, color: EDGE, loop: true })),
+      false,
     );
-    this.edge = this.scene.primitives.add(
-      new Primitive({
-        geometryInstances: hierarchies.map(
-          (polygonHierarchy) =>
-            new GeometryInstance({
-              geometry: new PolygonOutlineGeometry({ polygonHierarchy }),
-              attributes: { color: ColorGeometryInstanceAttribute.fromColor(EDGE) },
-            }),
-        ),
-        appearance: new PerInstanceColorAppearance({ flat: true, translucent: true }),
-        allowPicking: false,
-        asynchronous: false,
-      }),
-    );
+    if (edge) this.edge = this.scene.primitives.add(edge);
     this.update();
   }
 

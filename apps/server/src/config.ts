@@ -1,4 +1,4 @@
-import { PublicKey } from '@gbg-osint/shared';
+import { IonToken, PublicKey } from '@gbg-osint/shared';
 import { existsSync } from 'node:fs';
 import { z } from 'zod';
 
@@ -19,6 +19,8 @@ const ConfigSchema = z.object({
   CACHE_DIR: z.string().min(1).optional(),
   /** CARTO basemap key; it is sent to the browser, so use a key restricted to CARTO basemaps. */
   CARTO_API_KEY: z.union([z.literal(''), PublicKey]).optional(),
+  /** Cesium ion token for 3D terrain and buildings; it is sent to the browser like the CARTO key. */
+  CESIUM_ION_ACCESS_TOKEN: z.union([z.literal(''), IonToken]).optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
