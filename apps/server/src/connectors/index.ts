@@ -7,6 +7,7 @@ import { celestrak } from './celestrak';
 import { elpris } from './elpris';
 import { energyChartsSweden } from './energyCharts';
 import { goteborgAirQuality, goteborgTraffic, goteborgWaterLevels } from './goteborg';
+import { metNowcast, vivaHarbour } from './harbour';
 import { krisinformation } from './krisinformation';
 import { styrOchStall } from './nextbike';
 import { osmPois, osmWaterways } from './osm';
@@ -74,4 +75,6 @@ export const connectors: readonly Connector[] = [
   trafikverketTravelTimes,
   airportWeather,
   flightRoutes,
+  vivaHarbour,
+  metNowcast,
 ];

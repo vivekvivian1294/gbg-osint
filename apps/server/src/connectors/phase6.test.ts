@@ -269,7 +269,7 @@ describe('aviation', () => {
         flightCategory: 'MVFR',
         windDir: '180',
         windKt: 10,
-        visibility: '6+',
+        visibilitySm: '6+',
         ceilingFt: 1700,
         qnhHpa: 1020,
       },

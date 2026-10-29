@@ -7,6 +7,8 @@ interface BoardsPanelProps {
   hasBoardLayers: boolean;
   /** Live aircraft by callsign, so flights on the board can be tracked on the map. */
   aircraftByCallsign: ReadonlyMap<string, TrackRef>;
+  /** Live ships by MMSI, so expected ships can be tracked on the map. */
+  shipsById?: ReadonlyMap<string, TrackRef>;
   /** A line shown above a board, e.g. the airport's latest METAR. */
   notes?: ReadonlyMap<string, string>;
   onTrack(ref: TrackRef): void;
@@ -16,6 +18,8 @@ const MAX_ROWS = 40;
 const CLOCK_TICK_MS = 30_000;
 /** Rows stay visible this long after their (expected) time. */
 const KEEP_PAST_MS = 5 * 60_000;
+/** Ship ETAs are typed in by the crew and often run late. */
+const KEEP_PAST_SHIP_MS = 6 * 3600_000;
 const LATE_MS = 60_000;
 const BOARD_ORDER = ['Göteborg C', 'Göteborg Landvetter (GOT)'];
 
@@ -61,6 +65,7 @@ export function BoardsPanel({
   rows,
   hasBoardLayers,
   aircraftByCallsign,
+  shipsById,
   notes,
   onTrack,
 }: BoardsPanelProps) {
@@ -88,17 +93,21 @@ export function BoardsPanel({
 
   const onBoard = rows.filter((r) => r.board === board);
   const hasArrivals = onBoard.some((r) => r.direction === 'arrival');
-  const shownDirection = hasArrivals ? direction : 'departure';
+  const hasDepartures = onBoard.some((r) => r.direction === 'departure');
+  const shownDirection = !hasDepartures ? 'arrival' : hasArrivals ? direction : 'departure';
+  const ships = onBoard.length > 0 && onBoard.every((r) => r.mode === 'ship');
+  const keepPast = ships ? KEEP_PAST_SHIP_MS : KEEP_PAST_MS;
   const visible = onBoard
     .filter((r) => r.direction === shownDirection)
     .map((r) => ({ row: r, at: Date.parse(r.expected ?? r.planned) }))
-    .filter(({ at }) => at >= now - KEEP_PAST_MS)
+    .filter(({ at }) => at >= now - keepPast)
     .sort((a, b) => a.at - b.at)
     .slice(0, MAX_ROWS);
-  const placeHeader = shownDirection === 'arrival' ? 'From' : 'To';
-  const platformHeader = onBoard[0]?.mode === 'flight' ? 'Gate' : 'Pl.';
+  const placeHeader = ships ? 'Type' : shownDirection === 'arrival' ? 'From' : 'To';
+  const platformHeader = ships ? 'Dist.' : onBoard[0]?.mode === 'flight' ? 'Gate' : 'Pl.';
   // Road ferry boards list where each crossing leaves from instead of a line.
   const roadFerries = onBoard.every((r) => r.mode === 'ferry' && r.source === 'trafikverket');
+  const lineHeader = ships ? 'Ship' : roadFerries ? 'From' : 'Line';
   const note = notes?.get(board);
 
   return (
@@ -114,7 +123,7 @@ export function BoardsPanel({
             ))}
           </select>
         </label>
-        {hasArrivals && (
+        {hasArrivals && hasDepartures && (
           <div className="segmented" role="group" aria-label="Direction">
             <button
               type="button"
@@ -141,7 +150,7 @@ export function BoardsPanel({
           <thead>
             <tr>
               <th scope="col">Time</th>
-              <th scope="col">{roadFerries ? 'From' : 'Line'}</th>
+              <th scope="col">{lineHeader}</th>
               <th scope="col">{placeHeader}</th>
               <th scope="col">{platformHeader}</th>
             </tr>
@@ -149,6 +158,7 @@ export function BoardsPanel({
           <tbody>
             {visible.map(({ row, at }) => {
               const aircraft = row.callsign ? aircraftByCallsign.get(row.callsign) : undefined;
+              const target = aircraft ?? (row.mode === 'ship' ? shipsById?.get(row.id) : undefined);
               const past = at < now;
               return (
                 <tr
@@ -169,12 +179,12 @@ export function BoardsPanel({
                   </td>
                   <td className="board-platform">
                     {row.platform ?? ''}
-                    {aircraft && (
+                    {target && (
                       <button
                         type="button"
                         className="board-track"
-                        onClick={() => onTrack(aircraft)}
-                        title={`Track ${row.callsign} on the map`}
+                        onClick={() => onTrack(target)}
+                        title={`Track ${row.callsign ?? row.line} on the map`}
                         aria-label={`Track ${row.line} on the map`}
                       >
                         ◎

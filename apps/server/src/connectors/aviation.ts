@@ -63,7 +63,7 @@ export function parseMetars(raw: unknown): Entity[] {
         ...(m.wdir != null && { windDir: String(m.wdir) }),
         ...(m.wspd != null && { windKt: m.wspd }),
         ...(m.wgst != null && { gustKt: m.wgst }),
-        ...(m.visib != null && { visibility: String(m.visib) }),
+        ...(m.visib != null && { visibilitySm: String(m.visib) }),
         ...(ceiling !== undefined && { ceilingFt: ceiling }),
         ...(m.temp != null && { tempC: m.temp }),
         ...(m.dewp != null && { dewpointC: m.dewp }),

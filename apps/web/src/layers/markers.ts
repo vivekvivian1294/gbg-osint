@@ -299,7 +299,31 @@ export const ENTITY_STYLES: Record<string, EntityStyle> = {
     scale: 0.75,
     trackRange: 1_500,
   },
+  'harbour-stations': {
+    icon: 'sensor',
+    color: harbourColor,
+    label: (e) => {
+      const wind = num(e.props?.windMs);
+      const gust = num(e.props?.gustMs);
+      const level = num(e.props?.waterLevelCm);
+      if (wind !== undefined) {
+        return `${e.label} ${wind.toFixed(0)}${gust !== undefined ? `(${gust.toFixed(0)})` : ''} m/s`;
+      }
+      return level !== undefined ? `${e.label} ${level > 0 ? '+' : ''}${level} cm` : e.label;
+    },
+    labelMaxDistance: 25_000,
+    staleAfterMs: 30 * 60_000,
+    scale: 0.75,
+    trackRange: 2_000,
+  },
 };
+
+/** Gusts from fresh breeze to storm (Beaufort 5–10); water-only stations in cyan. */
+function harbourColor(e: Entity): string {
+  const gust = num(e.props?.gustMs) ?? num(e.props?.windMs);
+  if (gust === undefined) return '#22d3ee';
+  return gust >= 24.5 ? '#c084fc' : gust >= 17.2 ? '#f87171' : gust >= 10.8 ? '#fbbf24' : '#5eead4';
+}
 
 export const SEVERITY_COLORS: Record<Severity, string> = {
   info: '#7dd3fc',

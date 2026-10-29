@@ -24,6 +24,8 @@ const DECIMALS: Record<string, number> = {
   cm: 0,
   GW: 1,
   aircraft: 0,
+  'mm/h': 1,
+  min: 0,
 };
 
 export function formatMetric(m: Pick<Metric, 'value' | 'unit'>): string {

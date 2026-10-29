@@ -63,7 +63,18 @@ const PROP_LABELS: Record<string, string> = {
   tempC: 'Temperature (°C)',
   dewpointC: 'Dew point (°C)',
   qnhHpa: 'QNH (hPa)',
-  visibility: 'Visibility (SM)',
+  visibilitySm: 'Visibility (SM)',
+  visibility: 'Visibility',
+  windMs: 'Wind (m/s)',
+  gustMs: 'Gusts (m/s)',
+  windFromDeg: 'Wind from (°)',
+  waterLevelCm: 'Water level (cm)',
+  waterTempC: 'Water temperature (°C)',
+  airTempC: 'Air temperature (°C)',
+  pressureHpa: 'Pressure (hPa)',
+  currentKn: 'Surface current (kn)',
+  currentTowardsDeg: 'Current towards (°)',
+  eta: 'ETA (reported)',
 };
 const CAMERA_PHOTO = /^https:\/\/api\.trafikinfo\.trafikverket\.se\/[\w./-]+\.jpg$/i;
 

@@ -108,6 +108,37 @@ export function isoTime(value: string | undefined | null): string | undefined {
   return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
 }
 
+const stockholmParts = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Europe/Stockholm',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
+/** Milliseconds Stockholm wall-clock time is ahead of UTC at an instant (1 or 2 hours). */
+function stockholmOffsetMs(utcMs: number): number {
+  const p = Object.fromEntries(
+    stockholmParts.formatToParts(new Date(utcMs)).map((x) => [x.type, Number(x.value)]),
+  );
+  const wall = Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!, p.second!);
+  return wall - Math.floor(utcMs / 1000) * 1000;
+}
+
+/** ISO time for a Swedish wall-clock `YYYY-MM-DD HH:mm[:ss]` without a time zone. */
+export function stockholmTimeToIso(local: string): string | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(local.trim());
+  if (!m) return undefined;
+  const [, y, mo, d, h, mi, s] = m.map((v) => Number(v ?? 0)) as number[];
+  const asUtc = Date.UTC(y!, mo! - 1, d!, h!, mi!, s!);
+  if (!Number.isFinite(asUtc)) return undefined;
+  const guess = asUtc - stockholmOffsetMs(asUtc);
+  return new Date(asUtc - stockholmOffsetMs(guess)).toISOString();
+}
+
 const M_PER_DEG_LAT = 110_540;
 const M_PER_DEG_LON = 111_320 * Math.cos(GOTHENBURG.center.lat * toRad);
 

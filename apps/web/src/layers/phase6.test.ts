@@ -84,3 +84,31 @@ describe('Phase 6.1 markers', () => {
     expect(buildMarkers(layers, kinds, empty).map((m) => m.pick.ids[0])).toContain('vt-train');
   });
 });
+
+describe('harbour stations', () => {
+  const station = (id: string, props: Record<string, unknown>): Entity => ({
+    id,
+    source: 'viva',
+    kind: 'sensor',
+    lon: 11.79,
+    lat: 57.68,
+    label: id,
+    ts: '2026-10-29T00:30:00.000Z',
+    props,
+  });
+  const harbour = LAYER_BY_ID.get('harbour-stations')!;
+  const kinds = new Map<string, ChannelKind>([['env.harbour', 'entities']]);
+  const markersFor = (...stations: Entity[]) =>
+    buildMarkers([harbour], kinds, (c) => (c === 'env.harbour' ? stations : []));
+
+  it('labels wind (gusts) or water level and colours by gust strength', () => {
+    const [windy, calm, level] = markersFor(
+      station('Torshamnen', { windMs: 9.7, gustMs: 18 }),
+      station('Vinga', { windMs: 4, gustMs: 6 }),
+      station('Tångudden', { waterLevelCm: -12 }),
+    );
+    expect(windy).toMatchObject({ label: 'Torshamnen 10(18) m/s', color: '#f87171' });
+    expect(calm!.color).toBe('#5eead4');
+    expect(level).toMatchObject({ label: 'Tångudden -12 cm', color: '#22d3ee' });
+  });
+});

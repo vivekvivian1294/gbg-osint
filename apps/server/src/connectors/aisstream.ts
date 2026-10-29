@@ -1,12 +1,20 @@
-import { GOTHENBURG, type Entity } from '@gbg-osint/shared';
+import type { Departure, Entity } from '@gbg-osint/shared';
 import { createHash, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import type { StreamConnector } from '../core/connector';
 import { UpstreamError } from '../core/http';
-import { normalizeHeading, truncate } from './util';
+import { distanceM, normalizeHeading, truncate } from './util';
 
 const STREAM_URL = 'wss://stream.aisstream.io/v0/stream';
 const SHIPS = 'maritime.ships';
+const EXPECTED = 'maritime.expected';
+const EXPECTED_BOARD = 'Expected at Gothenburg (AIS)';
+/** The Kattegat approach, so ships bound for Gothenburg are seen hours before they arrive. */
+const APPROACH = { south: 56.6, west: 10.4, north: 58.6, east: 12.3 };
+/** Harbour entrance, for distances on the expected board. */
+const PORT = { lon: 11.79, lat: 57.69 };
+const ETA_PAST_MS = 6 * 3600_000;
+const ETA_AHEAD_MS = 7 * 24 * 3600_000;
 const PUBLISH_MS = 5_000;
 /** Reconnect when the stream goes quiet; the harbour always has some AIS traffic. */
 const SILENCE_MS = 3 * 60_000;
@@ -52,6 +60,9 @@ const ShipStatic = z.object({
   Type: z.number().optional(),
   Destination: z.string().optional(),
   Dimension: Dimension.optional(),
+  Eta: z
+    .object({ Month: z.number(), Day: z.number(), Hour: z.number(), Minute: z.number() })
+    .optional(),
 });
 const ClassBStatic = z.object({
   ReportA: z.object({ Valid: z.boolean().optional(), Name: z.string().optional() }).optional(),
@@ -82,6 +93,8 @@ interface Static {
   callsign?: string;
   type?: number;
   destination?: string;
+  /** Reported estimated time of arrival, epoch ms. */
+  eta?: number;
   lengthM?: number;
   beamM?: number;
 }
@@ -104,6 +117,34 @@ export function parseAisTime(value: string): number | undefined {
 }
 
 const clean = (s: string | undefined) => s?.replace(/@+$/, '').trim() || undefined;
+
+/**
+ * AIS ETAs have no year and use 0/24/60 for "not available"; the year closest to `now` is
+ * assumed.
+ */
+export function aisEta(
+  eta: { Month: number; Day: number; Hour: number; Minute: number } | undefined,
+  now: number,
+): number | undefined {
+  if (!eta) return undefined;
+  const { Month, Day, Hour, Minute } = eta;
+  if (Month < 1 || Month > 12 || Day < 1 || Day > 31 || Hour > 23 || Minute > 59) return undefined;
+  const year = new Date(now).getUTCFullYear();
+  const candidates = [year - 1, year, year + 1]
+    .map((y) => Date.UTC(y, Month - 1, Day, Hour, Minute))
+    .filter((t) => new Date(t).getUTCDate() === Day);
+  return candidates.sort((a, b) => Math.abs(a - now) - Math.abs(b - now))[0];
+}
+
+const PORT_NAMES =
+  /\bSE ?GOT\b|\bGOT\b|\bGBG\b|G[OÖ]TEBORG|GOTH?EN?B[OU]RG|GOTENBORG|SKANDIA|Ä?ALVSBORG|ARENDAL|TORSHAMN/;
+
+/** True if an AIS destination (free text, often `FROM>TO` or `A<>B`) is Gothenburg. */
+export function isGothenburgDestination(destination: string): boolean {
+  const text = destination.toUpperCase().replace(/\s+/g, ' ');
+  const parts = text.includes('<>') ? text.split('<>') : [text.split('>').at(-1)!];
+  return parts.some((p) => PORT_NAMES.test(p.trim()));
+}
 
 /** Hull length and beam from the AIS reference-point offsets; zeros mean "not available". */
 function dimensions(d: z.infer<typeof Dimension> | undefined): Pick<Static, 'lengthM' | 'beamM'> {
@@ -151,12 +192,14 @@ export function applyAisMessage(state: AisState, raw: unknown): void {
     const name = clean(s.Name);
     const callsign = clean(s.CallSign);
     const destination = clean(s.Destination);
+    const eta = aisEta(s.Eta, ts);
     state.statics.set(mmsi, {
       ts,
       ...(name && { name }),
       ...(callsign && { callsign }),
       ...(s.Type && { type: s.Type }),
       ...(destination && { destination }),
+      ...(eta !== undefined && { eta }),
       ...dimensions(s.Dimension),
     });
   } else if (type === 'StaticDataReport') {
@@ -218,6 +261,7 @@ const NAV_STATUS: Record<number, string> = {
 };
 
 const PRIVATE_CATEGORIES = new Set(['sailing', 'pleasure']);
+const HARBOUR_SERVICE = new Set(['tug', 'pilot', 'search & rescue', 'law enforcement']);
 
 /**
  * Ship entities. Leisure craft are usually owned by private people, so they are shown
@@ -268,10 +312,69 @@ export function shipEntities(state: AisState, salt: string): Entity[] {
         mmsi,
         ...(s?.callsign && { callsign: s.callsign }),
         ...(s?.destination && { destination: truncate(s.destination, 60) }),
+        ...(s?.eta !== undefined && { eta: new Date(s.eta).toISOString() }),
       },
     });
   }
   return entities;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  cargo: 'Cargo',
+  tanker: 'Tanker',
+  passenger: 'Passenger',
+  'high-speed': 'High-speed craft',
+  tug: 'Tug',
+  pilot: 'Pilot',
+  fishing: 'Fishing',
+  military: 'Military',
+  other: 'Vessel',
+  unknown: 'Vessel',
+};
+
+/**
+ * Ships reporting Gothenburg as their destination, by reported ETA. Leisure craft and harbour
+ * service craft (which always name their home port) are left out, as are ships already moored.
+ */
+export function expectedArrivals(state: AisState, now: number): Departure[] {
+  const rows: { row: Departure; eta: number }[] = [];
+  for (const [mmsi, s] of state.statics) {
+    if (!s.destination || s.eta === undefined || !s.name) continue;
+    if (s.eta < now - ETA_PAST_MS || s.eta > now + ETA_AHEAD_MS) continue;
+    if (!isGothenburgDestination(s.destination)) continue;
+    const category = shipCategory(s.type);
+    if (PRIVATE_CATEGORIES.has(category) || HARBOUR_SERVICE.has(category)) continue;
+    const p = state.positions.get(mmsi);
+    if (p?.navStatus === 5) continue;
+    if (p?.classB && category === 'unknown') continue;
+    const nm = p ? distanceM(p, PORT) / 1852 : undefined;
+    const status = p
+      ? (p.navStatus !== undefined && p.navStatus !== 0 && NAV_STATUS[p.navStatus]) ||
+        (p.sog !== undefined ? `${p.sog.toFixed(1)} kn` : undefined)
+      : 'position not received yet';
+    rows.push({
+      eta: s.eta,
+      row: {
+        id: String(mmsi),
+        source: 'aisstream',
+        board: EXPECTED_BOARD,
+        direction: 'arrival',
+        mode: 'ship',
+        line: truncate(s.name, 40),
+        place: truncate(
+          [CATEGORY_LABELS[category] ?? 'Vessel', s.lengthM && `${s.lengthM} m`]
+            .filter(Boolean)
+            .join(' · '),
+          200,
+        ),
+        planned: new Date(s.eta).toISOString(),
+        ...(nm !== undefined && { platform: `${nm < 10 ? nm.toFixed(1) : Math.round(nm)} nm` }),
+        ...(status && { status: truncate(status, 160) }),
+        cancelled: false,
+      },
+    });
+  }
+  return rows.sort((a, b) => a.eta - b.eta).map((r) => r.row);
 }
 
 const state = createAisState();
@@ -287,9 +390,12 @@ export const aisstreamShips: StreamConnector = {
   mode: 'stream',
   allowedHosts: ['stream.aisstream.io'],
   requiredEnv: ['AISSTREAM_API_KEY'],
-  channels: [{ name: SHIPS, kind: 'entities' }],
+  channels: [
+    { name: SHIPS, kind: 'entities' },
+    { name: EXPECTED, kind: 'departures' },
+  ],
   run(ctx) {
-    const { west, south, east, north } = GOTHENBURG.bbox;
+    const { west, south, east, north } = APPROACH;
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(STREAM_URL);
       ws.binaryType = 'arraybuffer';
@@ -305,6 +411,7 @@ export const aisstreamShips: StreamConnector = {
         }
         pruneAis(state, now);
         ctx.publish.replace(SHIPS, shipEntities(state, salt));
+        ctx.publish.replace(EXPECTED, expectedArrivals(state, now));
         if (received > 0) ctx.health.ok();
       }, PUBLISH_MS);
 

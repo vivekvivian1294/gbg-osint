@@ -93,7 +93,7 @@ export type Metric = z.infer<typeof MetricSchema>;
 
 const HexColor = z.string().regex(/^#[0-9a-f]{6}$/i);
 
-export const TransportMode = z.enum(['tram', 'bus', 'ferry', 'train', 'flight']);
+export const TransportMode = z.enum(['tram', 'bus', 'ferry', 'train', 'flight', 'ship']);
 export type TransportMode = z.infer<typeof TransportMode>;
 
 /** One row on a departure or arrival board (stop, station or airport). */

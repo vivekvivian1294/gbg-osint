@@ -319,11 +319,13 @@ export function App() {
   }));
 
   const aircraftByCallsign = new Map<string, TrackRef>();
+  const shipsById = new Map<string, TrackRef>();
   for (const c of trackables) {
     const callsign = c.entity.props?.callsign;
     if (c.layerId === 'aircraft' && typeof callsign === 'string') {
       aircraftByCallsign.set(callsign.toUpperCase(), toRef(c));
     }
+    if (c.layerId === 'ships') shipsById.set(c.id, toRef(c));
   }
 
   const feeds = {
@@ -657,6 +659,7 @@ export function App() {
               rows={boardRows}
               hasBoardLayers={boardChannels.length > 0}
               aircraftByCallsign={aircraftByCallsign}
+              shipsById={shipsById}
               notes={boardNotes}
               onTrack={track}
             />
