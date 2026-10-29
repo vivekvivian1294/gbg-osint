@@ -42,8 +42,9 @@ Keys stay on your machine: the server uses them, and only the CARTO basemap key 
 
 ## Using it
 
-- `?` lists the keyboard shortcuts. `Layers` turns sources on and off, `Feed` shows live events, `Boards` shows departures.
-- Click any vehicle, ship or aircraft for details, `T` to track it and `C` to ride along.
+- `?` lists the keyboard shortcuts. `Layers` turns sources on and off, `Feed` shows live events, `Boards` shows departures, and `Brief` (`N`) gives a "Now in Gothenburg" summary with the transit delay index.
+- Click any vehicle, ship or aircraft for details, `T` to track it and `C` to ride along. Ships, aircraft and trains show where they have been in the last 24 hours.
+- Hover the metrics strip, or open a sensor card, for 24-hour sparklines. The server keeps this history in its cache directory, so it survives restarts; it fills up while the server runs.
 - `S` plays camera tours, `G` opens the tools (measure, pins, routes). `1`–`6` switch the optics styles.
 - The URL keeps the camera, layers and tracked object, so links reopen the same view on your own copy.
 

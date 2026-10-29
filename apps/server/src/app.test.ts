@@ -1,4 +1,4 @@
-import type { ServerMessage } from '@gbg-osint/shared';
+import { BriefSchema, type ServerMessage } from '@gbg-osint/shared';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -112,6 +112,40 @@ describe('HTTP API', () => {
     expect((await app.inject('/api/channels/nope.channel/snapshot')).statusCode).toBe(404);
     expect((await app.inject('/api/channels/..%2F..%2Fetc/snapshot')).statusCode).toBe(404);
     expect((await app.inject('/api/unknown')).json()).toEqual({ error: 'Not Found' });
+  });
+
+  it('serves the brief and 24-hour history, and rejects malformed keys', async () => {
+    const { app, store, history } = await setup();
+    store.replace('test.metrics', [metric]);
+    history.sample(store, Date.now());
+
+    const brief = await app.inject('/api/brief');
+    expect(brief.statusCode).toBe(200);
+    expect(BriefSchema.safeParse(brief.json()).success).toBe(true);
+
+    const series = await app.inject('/api/history/series?prefix=test.metrics/');
+    expect(series.json()).toEqual({
+      series: [{ key: 'test.metrics/m1', unit: '°C', points: [[expect.any(Number), 7]] }],
+    });
+    expect((await app.inject('/api/history/series?prefix=env.harbour/viva-1/')).json()).toEqual({
+      series: [],
+    });
+    expect((await app.inject('/api/history/track/maritime.ships/265000001')).json()).toEqual({
+      key: 'maritime.ships/265000001',
+      points: [],
+    });
+
+    for (const path of [
+      '/api/history/series',
+      '/api/history/series?prefix=',
+      '/api/history/series?prefix=test.metrics',
+      '/api/history/series?prefix=..%2F',
+      '/api/history/series?prefix=a/b/c/',
+      '/api/history/track/Bad%20Channel/1',
+      '/api/history/track/maritime.ships/a%20b',
+    ]) {
+      expect((await app.inject(path)).statusCode, path).toBe(404);
+    }
   });
 
   it('rate limits per client', async () => {

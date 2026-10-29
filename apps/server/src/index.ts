@@ -6,7 +6,12 @@ import { connectors } from './connectors';
 loadDotEnv();
 const config = loadConfig(process.env);
 const webRoot = fileURLToPath(new URL('../../web/dist/', import.meta.url));
-const { app, scheduler, servesWeb } = await buildApp({ config, connectors, webRoot });
+const { app, scheduler, servesWeb } = await buildApp({
+  config,
+  connectors,
+  webRoot,
+  persistHistory: true,
+});
 
 try {
   await app.listen({ host: config.HOST, port: config.PORT });

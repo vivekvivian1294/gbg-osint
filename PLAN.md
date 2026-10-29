@@ -440,19 +440,22 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Daily satellite view** (NASA GIBS VIIRS true colour ✓, yesterday's image): an optional imagery layer for clouds, snow, ice and algae blooms.
 - **Seasonal:** pollen forecast (Pollenrapporten ✓) and bathing-water quality (HaV ✓, 30 sites in Göteborg with advisories against bathing).
 
-**6.3 Derived intelligence from data we already collect**
-- **24-hour memory** (a first step towards Phase 7):
-  - The server keeps ring buffers per metric series and per moving object.
-  - Sparklines in metric chips and cards (water level, air quality, spot price, energy mix, GNSS share).
-  - "Last 24 h" trails for a selected ship or aircraft *(GEV: trace backfill)*.
-- **Transit delay index:** worst lines and hubs right now, from planned vs expected times on the departure boards.
-- **Situation brief:** a rule-based "Now in Gothenburg" panel with no AI. Each line links to the map.
-  - Warnings and incidents.
-  - Transit and rail disruptions and the worst delays.
-  - Ships in port and arriving.
-  - GOT delays.
-  - Weather and rain nowcast, air quality, energy and price.
-- **Anomaly flags:** values far outside the last 24 hours, such as an unusual number of road incidents or police events, or water levels above their limits. Labelled as statistical flags, not alarms.
+**6.3 Derived intelligence from data we already collect** ✅ done
+- ✅ **24-hour memory** (a first step towards Phase 7):
+  - The server samples the live store every minute and keeps 5-minute series for every metric, selected sensor readings (ViVa wind, gusts, water level and current; river levels; air quality index; road surface and air temperature; METAR wind and ceiling; train delays), event counts per feed and the number of late departures at the hubs.
+  - Ships, aircraft and live trains get a 24-hour track (a point after 50 m of movement or every 10 minutes; anonymised leisure craft are skipped).
+  - The history is saved to the cache directory every 10 minutes and on shutdown, so a restart keeps it. Limits: 3,000 series, 4,000 tracks and 1,500 points per track.
+  - Hovering the metrics strip shows a 24-hour sparkline under each chip; sensor cards show a "last 24 h" sparkline per reading. Both fetch only when shown.
+  - Selecting or tracking a ship, aircraft or train draws its 24-hour path as a dashed line, broken where the record has gaps *(GEV: trace backfill)*.
+  - API: `GET /api/history/series?prefix=<channel>/[<id>/]` and `GET /api/history/track/<channel>/<id>`.
+- ✅ **Transit delay index:** the worst Västtrafik lines and the worst hubs (Västtrafik and Trafikverket boards), from planned vs expected times between half an hour ago and an hour ahead. Late means 3+ minutes; cancellations weigh heavily.
+- ✅ **Situation brief** (`N`, or *Brief* in the top bar): a rule-based "Now in Gothenburg" panel with no AI, refreshed every minute. Clicking a line turns its layer on, selects the item and flies there.
+  - Warnings and incidents: VMA, SMHI warnings, unplanned road incidents with large impact that started in the last 6 hours (planned roadworks and long-running restrictions are only counted), and police events in the last 3 hours.
+  - Transit and rail: rail disruptions, transit messages, the most delayed lines and the most delayed train.
+  - Harbour and sea: ships expected in the next 6 hours, AIS traffic, the strongest harbour gusts, sea level and rivers above their high-water mark.
+  - Landvetter: flights in the next 2 hours with cancellations and delays, and flight conditions from the METAR.
+  - Weather and environment (temperature, gusts, rain nowcast, poor air quality, ice or snow on roads), and energy (spot price and renewable share).
+- ✅ **Anomaly flags:** a robust z-score (median and MAD) of the latest value against the last 24 hours, for road and city traffic incidents, police events, rail disruptions, late departures, sea level and gusts. A flag needs 3 hours of history, |z| ≥ 3.5 and a minimum absolute change, and is labelled as a statistical flag, not an alarm. River levels above their limits appear in the harbour section.
 
 **6.4 Analyst tools**
 - **"What's here?" spot report:** right-click or long-press a point to see:
@@ -495,7 +498,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 **Suggested order**
 1. 6.1 quick wins. ✅
 2. ViVa stations, ships to Gothenburg and airport weather (harbour and airport picture). ✅
-3. 24-hour memory with sparklines, the situation brief and the delay index.
+3. 24-hour memory with sparklines, the situation brief and the delay index. ✅
 4. Spot report, nearest camera and watch areas.
 5. Weather extras and seasonal layers.
 6. The 6.5 items as keys arrive.

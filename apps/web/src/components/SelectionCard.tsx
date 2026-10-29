@@ -1,4 +1,5 @@
 import {
+  ENTITY_SERIES,
   isArea,
   isEntity,
   isEvent,
@@ -9,13 +10,15 @@ import {
   type Feature,
   type GeoEvent,
 } from '@gbg-osint/shared';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { PickRef } from '../engine/markerSpec';
 import { flowRatio } from '../engine/travelTimes';
 import type { Contact } from '../layers/contacts';
 import { DISTRICT_METRICS } from '../layers/districts';
 import { LAYER_BY_ID } from '../layers/registry';
 import { useFlightRoute } from '../state/flightRoutes';
+import { useSeries } from '../state/history';
+import { Sparkline } from './Sparkline';
 
 interface SelectionCardProps {
   selection: PickRef;
@@ -75,6 +78,9 @@ const PROP_LABELS: Record<string, string> = {
   currentKn: 'Surface current (kn)',
   currentTowardsDeg: 'Current towards (°)',
   eta: 'ETA (reported)',
+  levelM: 'Water level (m)',
+  aqi: 'Air quality index',
+  surfaceTempC: 'Road surface (°C)',
 };
 const CAMERA_PHOTO = /^https:\/\/api\.trafikinfo\.trafikverket\.se\/[\w./-]+\.jpg$/i;
 
@@ -196,7 +202,28 @@ function RawReport({ label, text }: { label: string; text: unknown }) {
   );
 }
 
-function EntityDetails({ entity }: { entity: Entity }) {
+/** 24-hour sparklines for a sensor's readings, from the server's history. */
+function EntityTrends({ channel, entityId }: { channel: string; entityId: string }) {
+  const series = useSeries(ENTITY_SERIES[channel] ? [`${channel}/${entityId}/`] : null);
+  const [now] = useState(Date.now);
+  const shown = series.filter((s) => s.points.length >= 2);
+  if (shown.length === 0) return null;
+  return (
+    <dl className="selection-trends" aria-label="Last 24 hours">
+      {shown.map((s) => {
+        const prop = s.key.slice(s.key.lastIndexOf('/') + 1);
+        const label = PROP_LABELS[prop] ?? prop;
+        return (
+          <Row key={s.key} term={label}>
+            <Sparkline series={s} now={now} label={label} />
+          </Row>
+        );
+      })}
+    </dl>
+  );
+}
+
+function EntityDetails({ entity, channel }: { entity: Entity; channel: string }) {
   const p = entity.props ?? {};
   return (
     <>
@@ -227,6 +254,7 @@ function EntityDetails({ entity }: { entity: Entity }) {
           ))}
         <Row term="Source">{entity.source}</Row>
       </dl>
+      <EntityTrends channel={channel} entityId={entity.id} />
       <RawReport label="METAR" text={p.metar} />
       <RawReport label="TAF" text={p.taf} />
       {entity.kind === 'camera' && entity.heading !== undefined && (
@@ -405,7 +433,7 @@ export function SelectionCard({ selection, items, tracking, onClose }: Selection
             (item.kind === 'photo' ? (
               <PhotoDetails entity={item} />
             ) : (
-              <EntityDetails entity={item} />
+              <EntityDetails entity={item} channel={selection.channel} />
             ))}
           {isEvent(item) && <EventDetails event={item} />}
           {isFeature(item) && item.kind === 'traffic' && <TrafficDetails feature={item} />}

@@ -1,5 +1,7 @@
 import { ChannelName, type ClientConfig, type Health } from '@gbg-osint/shared';
 import type { FastifyInstance } from 'fastify';
+import { buildBrief } from '../core/brief';
+import type { History } from '../core/history';
 import { UpstreamError } from '../core/http';
 import type { Scheduler } from '../core/scheduler';
 import type { ChannelStore } from '../core/store';
@@ -8,10 +10,15 @@ const CONNECTOR_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;
 /** Path segments of letters, digits, `_` and `-`, joined by `/` or `.` (so no `..`). */
 const DATA_PATH = /^[A-Za-z0-9_-]+(?:[./][A-Za-z0-9_-]+)*$/;
 const MAX_DATA_PATH = 200;
+/** A history key prefix such as `env.weather/` or `env.harbour/viva-101/` (a channel name first). */
+const HISTORY_PREFIX = /^[a-z0-9]+(?:\.[a-z0-9_-]+)+\/(?:[A-Za-z0-9_.:-]{1,128}\/)?$/;
+const MAX_HISTORY_PREFIX = 200;
+const ITEM_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 
 export interface ApiDeps {
   store: ChannelStore;
   scheduler: Scheduler;
+  history: History;
   version: string;
   clientConfig: ClientConfig;
   /** Map tiles and frames come in bursts, so `/api/data` has its own, higher limit. */
@@ -33,6 +40,28 @@ export function registerApiRoutes(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/sources', async () => deps.scheduler.statuses());
 
   app.get('/api/channels', async () => deps.store.list());
+
+  app.get('/api/brief', async () => buildBrief(deps.store, deps.history, Date.now()));
+
+  app.get<{ Querystring: { prefix?: string } }>('/api/history/series', async (request, reply) => {
+    const prefix = request.query.prefix ?? '';
+    if (prefix.length > MAX_HISTORY_PREFIX || !HISTORY_PREFIX.test(prefix)) {
+      return reply.code(404).send({ error: 'Not Found' });
+    }
+    return { series: deps.history.seriesUnder(prefix) };
+  });
+
+  app.get<{ Params: { channel: string; id: string } }>(
+    '/api/history/track/:channel/:id',
+    async (request, reply) => {
+      const { channel, id } = request.params;
+      if (!ChannelName.safeParse(channel).success || !ITEM_ID.test(id)) {
+        return reply.code(404).send({ error: 'Not Found' });
+      }
+      const key = `${channel}/${id}`;
+      return deps.history.trackOf(key) ?? { key, points: [] };
+    },
+  );
 
   app.get<{ Params: { channel: string } }>(
     '/api/channels/:channel/snapshot',

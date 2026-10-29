@@ -510,6 +510,136 @@ select option {
   overflow-wrap: anywhere;
 }
 
+/* Situation brief */
+
+.brief > .muted {
+  margin: 0 0 8px;
+  font: 11px var(--mono);
+}
+
+.brief-section h3 {
+  margin: 10px 0 4px;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.brief-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brief-item {
+  margin-bottom: 4px;
+  border-left: 2px solid var(--muted);
+}
+
+.brief-item > button,
+.brief-item > div {
+  display: block;
+  width: 100%;
+  padding: 3px 6px 3px 8px;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+}
+
+.brief-item > button:hover,
+.brief-item > button:focus-visible {
+  background: rgba(94, 234, 212, 0.08);
+}
+
+.brief-notice {
+  border-color: var(--accent);
+}
+
+.brief-warning {
+  border-color: var(--warn);
+}
+
+.brief-alert {
+  border-color: var(--danger);
+}
+
+.brief-text,
+.brief-detail {
+  display: block;
+}
+
+.brief-detail {
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+
+.brief-item .brief-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.brief-delays {
+  width: 100%;
+  margin-bottom: 8px;
+  border-collapse: collapse;
+  font: 12px var(--mono);
+}
+
+.brief-delays caption {
+  padding: 2px 0;
+  font-size: 11px;
+  text-align: left;
+  color: var(--muted);
+}
+
+.brief-delays th {
+  padding: 2px 4px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--muted);
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.brief-delays td {
+  padding: 3px 4px;
+  border-bottom: 1px solid rgba(94, 234, 212, 0.08);
+}
+
+.brief-delays td + td,
+.brief-delays th + th {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.brief-cancelled {
+  color: var(--danger);
+}
+
+/* 24-hour sparklines */
+
+.sparkline {
+  display: block;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.metrics-trends .metric .sparkline {
+  margin-top: 2px;
+}
+
+.selection .selection-trends {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.selection-trends dd {
+  align-self: center;
+}
+
 /* Dialogs */
 
 .modal {

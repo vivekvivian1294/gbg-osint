@@ -6,7 +6,7 @@ import type { SearchResult, EntityCandidate } from '../search/search';
 import type { ConnectionState } from '../state/live';
 import { SearchBox } from './SearchBox';
 
-export type RightPanel = 'feed' | 'boards' | 'radio';
+export type RightPanel = 'feed' | 'boards' | 'brief' | 'radio';
 
 interface TopBarProps {
   basemap: BasemapId;
@@ -71,6 +71,14 @@ export function TopBar(props: TopBarProps) {
           title="Departure boards (B)"
         >
           Boards
+        </button>
+        <button
+          type="button"
+          aria-pressed={props.rightPanel === 'brief'}
+          onClick={() => props.onToggleRight('brief')}
+          title="Now in Gothenburg: situation brief and delay index (N)"
+        >
+          Brief
         </button>
         <button
           type="button"

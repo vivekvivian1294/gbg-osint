@@ -12,6 +12,7 @@ const SHORTCUTS: readonly [string, string][] = [
   ['R', 'Reset to the city view'],
   ['/', 'Search'],
   ['B', 'Departure boards'],
+  ['N', 'Now in Gothenburg (situation brief)'],
   ['M', 'Missions'],
   ['S', 'Scene director (camera tours)'],
   ['G', 'Map tools: measure, pins, route A→B'],

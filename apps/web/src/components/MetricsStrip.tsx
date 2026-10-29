@@ -1,9 +1,14 @@
 import type { Metric } from '@gbg-osint/shared';
+import { useState } from 'react';
+import { useSeries } from '../state/history';
+import { Sparkline } from './Sparkline';
 
 export interface MetricGroup {
   layerId: string;
   label: string;
   note?: string;
+  /** Metric channels in this group, for their 24-hour history. */
+  channels: readonly string[];
   metrics: readonly Metric[];
 }
 
@@ -39,29 +44,44 @@ export function formatMetric(m: Pick<Metric, 'value' | 'unit'>): string {
 }
 
 export function MetricsStrip({ groups }: { groups: readonly MetricGroup[] }) {
+  // History is only fetched once the strip has been hovered or focused.
+  const [trends, setTrends] = useState(false);
   const visible = groups.filter((g) => g.metrics.length > 0);
   if (visible.length === 0) return null;
   return (
-    <section className="metrics" aria-label="Current conditions">
+    <section
+      className={trends ? 'metrics metrics-trends' : 'metrics'}
+      aria-label="Current conditions"
+      onMouseEnter={() => setTrends(true)}
+      onFocus={() => setTrends(true)}
+    >
       {visible.map((g) => (
-        <dl
-          key={g.layerId}
-          className="metric-group"
-          aria-label={g.label}
-          {...(g.note && { title: g.note })}
-        >
-          {g.metrics.map((m) => (
-            <div
-              key={m.id}
-              className="metric"
-              title={`${m.name} · ${timeFormat.format(new Date(m.ts))}${g.note ? `\n${g.note}` : ''}`}
-            >
-              <dt>{m.name}</dt>
-              <dd>{formatMetric(m)}</dd>
-            </div>
-          ))}
-        </dl>
+        <MetricGroupView key={g.layerId} group={g} trends={trends} />
       ))}
     </section>
+  );
+}
+
+function MetricGroupView({ group: g, trends }: { group: MetricGroup; trends: boolean }) {
+  const series = useSeries(trends ? g.channels.map((c) => `${c}/`) : null);
+  const byKey = new Map(series.map((s) => [s.key, s]));
+  const [now] = useState(Date.now);
+  return (
+    <dl className="metric-group" aria-label={g.label} {...(g.note && { title: g.note })}>
+      {g.metrics.map((m) => {
+        const history = g.channels.map((c) => byKey.get(`${c}/${m.id}`)).find(Boolean);
+        return (
+          <div
+            key={m.id}
+            className="metric"
+            title={`${m.name} · ${timeFormat.format(new Date(m.ts))}${g.note ? `\n${g.note}` : ''}`}
+          >
+            <dt>{m.name}</dt>
+            <dd>{formatMetric(m)}</dd>
+            {trends && history && <Sparkline series={history} now={now} label={m.name} />}
+          </div>
+        );
+      })}
+    </dl>
   );
 }

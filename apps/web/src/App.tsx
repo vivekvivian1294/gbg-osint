@@ -7,6 +7,8 @@ import {
   isFeature,
   isFrame,
   isMetric,
+  TRACK_CHANNELS,
+  type BriefTarget,
   type ChannelItem,
   type ChannelKind,
   type ClientConfig,
@@ -14,6 +16,7 @@ import {
 } from '@gbg-osint/shared';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { BoardsPanel } from './components/BoardsPanel';
+import { BriefPanel } from './components/BriefPanel';
 import { CameraReadout } from './components/CameraReadout';
 import { Clock } from './components/Clock';
 import { DistrictLegend } from './components/DistrictLegend';
@@ -65,6 +68,7 @@ import type { Mission } from './missions';
 import type { SearchResult } from './search/search';
 import { fetchJson } from './state/api';
 import { useCatalog, useLive } from './state/hooks';
+import { useTrack } from './state/history';
 import { LiveClient } from './state/live';
 import { createStore } from './state/store';
 import { useStreetPhotos } from './state/streetPhotos';
@@ -77,6 +81,7 @@ const WIDE_SCREEN_QUERY = '(min-width: 900px)';
 const VISITED_KEY = 'gbg-osint:visited';
 const DENSITIES: readonly number[] = [1, 0.5, 0.25];
 const SEARCH_VIEW_HEIGHT_M = 2500;
+const BRIEF_VIEW_HEIGHT_M = 3000;
 const TOAST_MS = 2500;
 const PHOTO_CHANNEL = 'photos.street';
 /** Layers whose objects have a sensible cab or bow view. */
@@ -268,6 +273,7 @@ export function App() {
       layerId: l.id,
       label: l.label,
       ...(l.note && { note: l.note }),
+      channels: l.channels.filter((c) => channelKinds.get(c) === 'metrics'),
       metrics: l.channels.flatMap(itemsOf).filter(isMetric),
     }));
 
@@ -333,6 +339,14 @@ export function App() {
     total: catalog.sources.filter((s) => s.state !== 'disabled').length,
   };
 
+  const trailOf: TrackRef | null =
+    tracked ??
+    (selection?.ids.length === 1 ? { layerId: selection.layerId, id: selection.ids[0]! } : null);
+  const trailChannel = trailOf
+    ? LAYER_BY_ID.get(trailOf.layerId)?.channels.find((c) => TRACK_CHANNELS.has(c))
+    : undefined;
+  const trail = useTrack(trailChannel ?? null, trailChannel && trailOf ? trailOf.id : null);
+
   const track = (ref: TrackRef) => {
     setRosterRefs(null);
     setTracked(ref);
@@ -375,6 +389,16 @@ export function App() {
     globeRef.current?.flyTo(target);
   };
   const resetView = () => flyTo(homeCamera());
+  const showBriefTarget = (target: BriefTarget) => {
+    const layer = LAYERS.find((l) => l.channels.includes(target.channel));
+    if (layer && !enabled.has(layer.id)) toggleLayer(layer.id);
+    if (target.lon !== undefined && target.lat !== undefined) {
+      flyTo(viewOf(target.lon, target.lat, BRIEF_VIEW_HEIGHT_M));
+    }
+    if (layer && target.ids.length > 0) {
+      setSelection({ layerId: layer.id, channel: target.channel, ids: target.ids });
+    }
+  };
 
   const showToast = (message: string) => {
     window.clearTimeout(toastTimer.current);
@@ -507,6 +531,10 @@ export function App() {
         case 'B':
           toggleRight('boards');
           break;
+        case 'n':
+        case 'N':
+          toggleRight('brief');
+          break;
         case '?':
           setDialog('help');
           break;
@@ -563,6 +591,7 @@ export function App() {
         waterways={featureSet('waterways')}
         traffic={featureSet('traffic')}
         travelTimes={featureSet('travel-times')}
+        trail={trail ?? null}
         radar={radarFrames}
         buildings={isActive('buildings')}
         cameraViews={cameraViews}
@@ -634,7 +663,7 @@ export function App() {
               aria-pressed={panels.right === 'feed'}
               onClick={() => setPanels((p) => ({ ...p, right: 'feed' }))}
             >
-              Live feed
+              Feed
             </button>
             <button
               type="button"
@@ -642,6 +671,13 @@ export function App() {
               onClick={() => setPanels((p) => ({ ...p, right: 'boards' }))}
             >
               Boards
+            </button>
+            <button
+              type="button"
+              aria-pressed={panels.right === 'brief'}
+              onClick={() => setPanels((p) => ({ ...p, right: 'brief' }))}
+            >
+              Brief
             </button>
             <button
               type="button"
@@ -665,6 +701,7 @@ export function App() {
             />
           )}
           {panels.right === 'radio' && <RadioPanel playing={radio} onPlay={setRadio} />}
+          {panels.right === 'brief' && <BriefPanel onShow={showBriefTarget} />}
         </aside>
       )}
       {radio && (

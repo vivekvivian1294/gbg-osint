@@ -1,4 +1,4 @@
-import type { ClientConfig, Feature, Frame } from '@gbg-osint/shared';
+import type { ClientConfig, Feature, Frame, Track } from '@gbg-osint/shared';
 import {
   Cartographic,
   Math as CesiumMath,
@@ -12,6 +12,7 @@ import { BuildingLayer } from '../engine/buildings';
 import type { CameraState } from '../engine/cameraState';
 import { DistrictLayer } from '../engine/districts';
 import { createGlobe, getCameraState, setBasemap, setCameraState } from '../engine/globe';
+import { HistoryTrailLayer } from '../engine/historyTrail';
 import type { MarkerSpec, PickRef } from '../engine/markerSpec';
 import { MarkerRenderer } from '../engine/markers';
 import { Overlay, type OverlayStats } from '../engine/overlay';
@@ -88,6 +89,8 @@ interface GlobeViewProps {
   waterways: FeatureSet | null;
   traffic: FeatureSet | null;
   travelTimes: FeatureSet | null;
+  /** 24-hour path of the selected or tracked ship, aircraft or train. */
+  trail: Track | null;
   radar: RadarFrames | null;
   buildings: boolean;
   cameraViews: CameraViews | null;
@@ -115,6 +118,7 @@ interface Engine {
   waterways: WaterwayLayer;
   traffic: TrafficLayer;
   travelTimes: TravelTimeLayer;
+  trail: HistoryTrailLayer;
   radar: RadarLayer;
   buildings: BuildingLayer;
   viewsheds: ViewshedLayer;
@@ -131,6 +135,9 @@ export function GlobeView(props: GlobeViewProps) {
   const waterwaysKey = featureKey(props.waterways);
   const trafficKey = featureKey(props.traffic);
   const travelTimesKey = featureKey(props.travelTimes);
+  const trailKey = props.trail
+    ? `${props.trail.key}:${props.trail.points.length}:${props.trail.points.at(-1)?.[0] ?? 0}`
+    : 'off';
   const radarKey = props.radar ? props.radar.version : 'off';
   const viewsKey = props.cameraViews ? props.cameraViews.version : 'off';
   const districtsKey = props.districts ? props.districts.key : 'off';
@@ -169,6 +176,7 @@ export function GlobeView(props: GlobeViewProps) {
       waterways: new WaterwayLayer(globe.scene),
       traffic: new TrafficLayer(globe.scene),
       travelTimes: new TravelTimeLayer(globe.scene),
+      trail: new HistoryTrailLayer(globe.scene),
       radar: new RadarLayer(globe, (state) => latest.current.radarStore.set(state)),
       buildings: new BuildingLayer(globe.scene, globe.creditDisplay),
       viewsheds: new ViewshedLayer(globe.scene),
@@ -262,6 +270,7 @@ export function GlobeView(props: GlobeViewProps) {
       engine.waterways.clear();
       engine.traffic.destroy();
       engine.travelTimes.destroy();
+      engine.trail.destroy();
       engine.radar.clear();
       engine.buildings.destroy();
       engine.viewsheds.clear();
@@ -300,6 +309,14 @@ export function GlobeView(props: GlobeViewProps) {
     if (set) engine.travelTimes.set(set.layerId, set.channel, set.features);
     else engine.travelTimes.clear();
   }, [travelTimesKey]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const trail = latest.current.trail;
+    if (trail) engine.trail.set(trail);
+    else engine.trail.clear();
+  }, [trailKey]);
 
   useEffect(() => {
     const engine = engineRef.current;
