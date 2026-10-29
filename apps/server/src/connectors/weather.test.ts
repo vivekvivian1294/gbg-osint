@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createDiskCache } from '../core/cache';
 import type { ConnectorContext } from '../core/connector';
+import { UpstreamError } from '../core/http';
 import { parseGibsPath } from './gibs';
 import { parseWindGrid, windGridPoints, WIND_GRID } from './openMeteo';
 import {
@@ -221,7 +222,8 @@ describe('bathing waters', () => {
     expect(assessment(undefined)).toBe('Not assessed');
   });
 
-  it('caches sample results on disk, so the next poll skips them', async () => {
+  /** Runs the bathing poll against fake HTTP and a temporary disk cache. */
+  async function runPolls(sites: unknown[], results: () => unknown, times: number) {
     vi.useFakeTimers({ toFake: ['setTimeout'] });
     const dir = mkdtempSync(join(tmpdir(), 'hav-'));
     const calls: string[] = [];
@@ -231,9 +233,7 @@ describe('bathing waters', () => {
       http: {
         getJson: async (url: string) => {
           calls.push(url);
-          return url.endsWith('/results')
-            ? { results: [{ takenAt: '2026-08-03T22:00:00Z', sampleAssessIdText: 'Tjänligt' }] }
-            : { watersAndAdvisories: [site('SE0A21480000000001', '11.7', '57.72')] };
+          return url.endsWith('/results') ? results() : { watersAndAdvisories: sites };
         },
       },
       publish: { replace: (_: string, items: unknown[]) => published.push(items) },
@@ -253,19 +253,44 @@ describe('bathing waters', () => {
       await run;
     };
     try {
-      await poll();
-      await poll();
+      for (let i = 0; i < times; i++) await poll();
     } finally {
       vi.useRealTimers();
       rmSync(dir, { recursive: true, force: true });
     }
+    return { calls: calls.filter((u) => u.endsWith('/results')), published, warn };
+  }
+
+  it('caches sample results on disk, so the next poll skips them', async () => {
+    const { calls, published, warn } = await runPolls(
+      [site('SE0A21480000000001', '11.7', '57.72')],
+      () => ({ results: [{ takenAt: '2026-08-03T22:00:00Z', sampleAssessIdText: 'Tjänligt' }] }),
+      2,
+    );
     expect(warn).not.toHaveBeenCalled();
-    expect(calls.filter((u) => u.endsWith('/results'))).toHaveLength(1);
+    expect(calls).toHaveLength(1);
     expect(published.at(-1)).toEqual([
       expect.objectContaining({
         props: expect.objectContaining({ lastSample: 'Fit for bathing' }),
       }),
     ]);
+  });
+
+  it('stops at the rate limit and says how many samples are left', async () => {
+    const { calls, published, warn } = await runPolls(
+      [
+        site('SE0A21480000000001', '11.7', '57.72'),
+        site('SE0A21480000000002', '11.8', '57.7'),
+        site('SE0A21480000000003', '11.9', '57.6'),
+      ],
+      () => {
+        throw new UpstreamError('HTTP 429 from gw.havochvatten.se', 429);
+      },
+      1,
+    );
+    expect(calls).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith({ remaining: 3 }, expect.stringContaining('rate limit'));
+    expect(published.at(-1)).toHaveLength(3);
   });
 });
 

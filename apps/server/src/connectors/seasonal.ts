@@ -270,7 +270,7 @@ export const bathingWaters: PollConnector = {
     }
     publish();
     // Sample results change at most every couple of weeks in summer; fetch them slowly.
-    for (const s of stale) {
+    for (const [i, s] of stale.entries()) {
       if (ctx.signal.aborted) return;
       await new Promise((r) => setTimeout(r, REQUEST_GAP_MS));
       try {
@@ -279,7 +279,13 @@ export const bathingWaters: PollConnector = {
         samples.set(s.bathingWater.id, sample);
         await ctx.cache.set(resultKey(s.bathingWater.id), sample);
       } catch (err) {
-        if (err instanceof UpstreamError && err.status === 429) break;
+        if (err instanceof UpstreamError && err.status === 429) {
+          ctx.log.warn(
+            { remaining: stale.length - i },
+            'HaV rate limit reached; remaining bathing samples are fetched on the next poll',
+          );
+          break;
+        }
         ctx.log.warn({ err, site: s.bathingWater.id }, 'Bathing water results failed');
       }
     }
