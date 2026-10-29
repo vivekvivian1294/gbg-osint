@@ -4,6 +4,7 @@ import {
   type ChannelItem,
   type ChannelKind,
   type Entity,
+  type Feature,
   type GeoEvent,
   type Severity,
 } from '@gbg-osint/shared';
@@ -130,6 +131,29 @@ export function bathingColor(e: Entity): string {
   if (e.props?.adviceAgainstBathing || sample === 'Unfit for bathing') return '#f87171';
   if (e.props?.abnormalSituation || sample === 'Fit, with remarks') return '#fbbf24';
   return sample ? '#38bdf8' : '#94a3b8';
+}
+
+/** By the most significant mode served: train, tram, ferry, then bus. */
+function stopColor(e: Entity): string {
+  const first = String(e.props?.modes ?? '').split(',')[0] ?? '';
+  return MODE_COLORS[first] ?? '#94a3b8';
+}
+
+export const MODE_COLORS: Record<string, string> = {
+  tram: '#38bdf8',
+  bus: '#a3e635',
+  ferry: '#22d3ee',
+  train: '#c084fc',
+};
+
+/** Key for a line's colour as published on the live vehicles. */
+export const lineKey = (mode: unknown, line: unknown) =>
+  `${String(mode).toLowerCase()}|${String(line)}`;
+
+/** The line's own colour when its vehicles are on the map, else the mode's. */
+export function routeColor(f: Feature, lineColors: ReadonlyMap<string, string>): string {
+  const mode = String(f.props?.mode);
+  return lineColors.get(lineKey(mode, f.props?.line)) ?? MODE_COLORS[mode] ?? '#94a3b8';
 }
 
 export const ENTITY_STYLES: Record<string, EntityStyle> = {
@@ -304,6 +328,14 @@ export const ENTITY_STYLES: Record<string, EntityStyle> = {
     labelMaxDistance: 8_000,
     scale: 0.75,
     trackRange: 1_200,
+  },
+  'transit-stops': {
+    icon: 'poi',
+    color: stopColor,
+    label: (e) => e.label,
+    labelMaxDistance: 2_500,
+    scale: 0.5,
+    trackRange: 600,
   },
   'water-levels': {
     icon: 'sensor',

@@ -100,6 +100,23 @@ export const LAYERS: readonly LayerDef[] = [
     note: 'Measured travel times on Trafikverket stretches, coloured by speed against free flow.',
   },
   {
+    id: 'transit-routes',
+    label: 'Public transport routes',
+    group: 'infrastructure',
+    sourceIds: ['trafiklab.gtfs'],
+    channels: ['transit.routes'],
+    phase: 6,
+    note: 'Västtrafik timetable routes (GTFS via Trafiklab), the most common path for each line and direction, in the line’s colour when its vehicles are on the map.',
+  },
+  {
+    id: 'transit-stops',
+    label: 'Stops & stations',
+    group: 'infrastructure',
+    sourceIds: ['trafiklab.gtfs'],
+    channels: ['transit.stops'],
+    phase: 6,
+  },
+  {
     id: 'departures',
     label: 'Tram, bus & ferry hubs',
     group: 'boards',

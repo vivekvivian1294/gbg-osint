@@ -37,6 +37,7 @@ Everything keyless works out of the box. Keys unlock more layers. Copy `.env.exa
 | `AISSTREAM_API_KEY`                                | Ships (AIS)                                                                    | [aisstream.io](https://aisstream.io/)                         |
 | `SWEDAVIA_FLIGHTINFO_KEY`                          | Landvetter departures and arrivals                                             | [apideveloper.swedavia.se](https://apideveloper.swedavia.se/) |
 | `CARTO_API_KEY`                                    | Dark Matter and Voyager basemaps                                               | [carto.com](https://carto.com/)                               |
+| `TRAFIKLAB_GTFS_REGIONAL_KEY`                      | Public transport routes and stops (GTFS Regional Static)                       | [trafiklab.se](https://www.trafiklab.se/)                     |
 
 Keys stay on your machine: the server uses them, and only the CARTO basemap key is sent to your browser. Each layer says which key it needs instead of failing silently.
 

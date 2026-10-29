@@ -480,7 +480,10 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Address search:** Photon or Nominatim through the server, cached and limited to 1 request/s, after bundled places and coordinates.
 
 **6.5 Needs a key or subscription from you**
-- **Trafiklab:** subscribe the existing key to *GTFS Regional Static* (it currently returns 403). This gives tram and bus route shapes (trams follow their tracks), a stops layer and line names.
+- ✅ **Trafiklab GTFS Regional** (`TRAFIKLAB_GTFS_REGIONAL_KEY`): the Västtrafik feed (about 100 MB zipped, 570 MB unpacked) is downloaded at most once a week; the free tier allows few downloads a month, so the processed network is cached on disk and reused across restarts. A small built-in zip reader streams `shapes.txt` and `stop_times.txt` (about 5 million lines each, about 8 s).
+  - *Public transport routes:* the most common path for each line and direction within the area (about 440 lines, simplified to 4 m), in the line's own Västtrafik colour when its vehicles are on the map, else by mode; buses fainter. Shapes are split where the source has gaps over 5 km. Clicking a line shows where it goes and the operator.
+  - *Stops & stations:* about 1,300 stations with the lines serving them (e.g. Brunnsparken: "Tram 1, 2, 3 … · Bus 18, 25 …"), coloured by their main mode and searchable.
+  - Not done: snapping trams to their own line's shape (they already follow OSM tracks).
 - **Västtrafik portal:** subscribe to *Trafikstörningar* (currently 403) to get transit disruptions.
 - **Göteborgs Stad APIM key:** Hisingsbron opening status, enabling the *Bridge lift* mission.
 - **NASA FIRMS** (free map key): active fires, which matter in dry Swedish summers.

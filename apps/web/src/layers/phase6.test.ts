@@ -1,8 +1,8 @@
-import type { ChannelItem, ChannelKind, Entity } from '@gbg-osint/shared';
+import type { ChannelItem, ChannelKind, Entity, Feature } from '@gbg-osint/shared';
 import { describe, expect, it } from 'vitest';
 import { LocalFrame } from '../engine/path';
 import { flowRatio, offsetLine, travelTimeColor } from '../engine/travelTimes';
-import { buildMarkers, FLIGHT_CATEGORY_COLORS } from './markers';
+import { buildMarkers, FLIGHT_CATEGORY_COLORS, lineKey, MODE_COLORS, routeColor } from './markers';
 import { LAYER_BY_ID, type LayerDef } from './registry';
 
 const train = (id: string, source: string, props: Record<string, unknown> = {}): Entity => ({
@@ -15,6 +15,44 @@ const train = (id: string, source: string, props: Record<string, unknown> = {}):
   label: id,
   ts: '2026-10-29T08:00:00.000Z',
   props,
+});
+
+describe('public transport routes and stops', () => {
+  const route = (mode: string, line: string): Feature => ({
+    id: `${mode}-${line}`,
+    source: 'trafiklab',
+    kind: 'transit-route',
+    line: '_p~iF~ps|U_ulLnnqC',
+    ts: '2026-10-29T08:00:00.000Z',
+    props: { mode, line },
+  });
+
+  it('uses the live line colour when known, else the mode colour', () => {
+    const colors = new Map([[lineKey('TRAM', '6'), '#f59e0b']]);
+    expect(routeColor(route('tram', '6'), colors)).toBe('#f59e0b');
+    expect(routeColor(route('tram', '7'), colors)).toBe(MODE_COLORS.tram);
+    expect(routeColor(route('bus', '6'), colors)).toBe(MODE_COLORS.bus);
+    expect(routeColor(route('cable car', '1'), colors)).toBe('#94a3b8');
+  });
+
+  it('colours stops by their most significant mode', () => {
+    const stop = (modes: string): Entity => ({
+      id: modes,
+      source: 'trafiklab',
+      kind: 'poi',
+      lon: 11.97,
+      lat: 57.7,
+      label: 'Brunnsparken',
+      ts: '2026-10-29T08:00:00.000Z',
+      props: { lines: 'Tram 6', modes },
+    });
+    const markers = buildMarkers(
+      [LAYER_BY_ID.get('transit-stops')!],
+      new Map<string, ChannelKind>([['transit.stops', 'entities']]),
+      () => [stop('tram,bus'), stop('bus'), stop('')],
+    );
+    expect(markers.map((m) => m.color)).toEqual([MODE_COLORS.tram, MODE_COLORS.bus, '#94a3b8']);
+  });
 });
 
 describe('travel times', () => {

@@ -57,7 +57,7 @@ import {
   type Contact,
   type TrackRef,
 } from './layers/contacts';
-import { buildMarkers } from './layers/markers';
+import { buildMarkers, lineKey } from './layers/markers';
 import { classifyDistricts, DEFAULT_DISTRICT_METRIC } from './layers/districts';
 import { buildWindField, compass, windAt } from './layers/wind';
 import {
@@ -298,6 +298,13 @@ export function App() {
     : null;
 
   const windVersion = isActive('wind') ? live.version('env.wind') : -1;
+  const lineColors = new Map<string, string>();
+  if (isActive('transit-routes')) {
+    for (const e of itemsOf('transit.vehicles').filter(isEntity)) {
+      const color = e.props?.color;
+      if (typeof color === 'string') lineColors.set(lineKey(e.props?.mode, e.props?.line), color);
+    }
+  }
   const wind = useMemo(
     () => (windVersion < 0 ? null : buildWindField(live.items('env.wind'))),
     [live, windVersion],
@@ -683,6 +690,8 @@ export function App() {
         waterways={featureSet('waterways')}
         traffic={featureSet('traffic')}
         travelTimes={featureSet('travel-times')}
+        transitRoutes={featureSet('transit-routes')}
+        lineColors={lineColors}
         trail={trail ?? null}
         wind={wind}
         satellite={isActive('satellite')}

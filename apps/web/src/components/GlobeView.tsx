@@ -25,6 +25,7 @@ import { TourPlayer, type Tour, type TourState } from '../engine/tours';
 import { CameraTracker } from '../engine/tracker';
 import { TrafficLayer } from '../engine/traffic';
 import { TravelTimeLayer } from '../engine/travelTimes';
+import { TransitRouteLayer } from '../engine/transitRoutes';
 import { WindLayer } from '../engine/wind';
 import type { WindField } from '../layers/wind';
 import { ViewshedLayer, type ViewCamera } from '../engine/viewsheds';
@@ -109,6 +110,9 @@ interface GlobeViewProps {
   waterways: FeatureSet | null;
   traffic: FeatureSet | null;
   travelTimes: FeatureSet | null;
+  transitRoutes: FeatureSet | null;
+  /** Live vehicle colours by mode and line, for the route lines. */
+  lineColors: ReadonlyMap<string, string>;
   /** 24-hour path of the selected or tracked ship, aircraft or train. */
   trail: Track | null;
   wind: WindField | null;
@@ -145,6 +149,7 @@ interface Engine {
   waterways: WaterwayLayer;
   traffic: TrafficLayer;
   travelTimes: TravelTimeLayer;
+  transitRoutes: TransitRouteLayer;
   trail: HistoryTrailLayer;
   wind: WindLayer;
   satellite: SatelliteLayer;
@@ -164,6 +169,7 @@ export function GlobeView(props: GlobeViewProps) {
   const waterwaysKey = featureKey(props.waterways);
   const trafficKey = featureKey(props.traffic);
   const travelTimesKey = featureKey(props.travelTimes);
+  const transitRoutesKey = `${featureKey(props.transitRoutes)}|${[...props.lineColors].sort().join()}`;
   const trailKey = props.trail
     ? `${props.trail.key}:${props.trail.points.length}:${props.trail.points.at(-1)?.[0] ?? 0}`
     : 'off';
@@ -207,6 +213,7 @@ export function GlobeView(props: GlobeViewProps) {
       waterways: new WaterwayLayer(globe.scene),
       traffic: new TrafficLayer(globe.scene),
       travelTimes: new TravelTimeLayer(globe.scene),
+      transitRoutes: new TransitRouteLayer(globe.scene),
       trail: new HistoryTrailLayer(globe.scene),
       wind: new WindLayer(windCanvas, globe.scene),
       satellite: new SatelliteLayer(globe),
@@ -343,6 +350,7 @@ export function GlobeView(props: GlobeViewProps) {
       engine.waterways.clear();
       engine.traffic.destroy();
       engine.travelTimes.destroy();
+      engine.transitRoutes.destroy();
       engine.trail.destroy();
       engine.wind.set(null);
       engine.satellite.hide();
@@ -384,6 +392,15 @@ export function GlobeView(props: GlobeViewProps) {
     if (set) engine.travelTimes.set(set.layerId, set.channel, set.features);
     else engine.travelTimes.clear();
   }, [travelTimesKey]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const set = latest.current.transitRoutes;
+    if (set) {
+      engine.transitRoutes.set(set.layerId, set.channel, set.features, latest.current.lineColors);
+    } else engine.transitRoutes.clear();
+  }, [transitRoutesKey]);
 
   useEffect(() => {
     const engine = engineRef.current;

@@ -64,7 +64,7 @@ function formatValue(value: unknown): string {
 }
 
 /** Props used for styling or rendered separately rather than listed. */
-const HIDDEN_PROPS = new Set(['color', 'textColor', 'photoUrl', 'metar', 'taf']);
+const HIDDEN_PROPS = new Set(['color', 'textColor', 'photoUrl', 'metar', 'taf', 'modes']);
 
 /** Readable names for props that would otherwise show as code. */
 const PROP_LABELS: Record<string, string> = {
@@ -100,6 +100,7 @@ const PROP_LABELS: Record<string, string> = {
   aqi: 'Air quality index',
   surfaceTempC: 'Road surface (°C)',
   pm25Ugm3: 'PM2.5 (µg/m³)',
+  lines: 'Lines',
   pm10Ugm3: 'PM10 (µg/m³)',
   humidityPct: 'Humidity (%)',
   aqiLabel: 'Air quality',
@@ -382,6 +383,25 @@ function TrafficDetails({ feature }: { feature: Feature }) {
 const minutes = (s: number) =>
   `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
+function TransitRouteDetails({ feature }: { feature: Feature }) {
+  const p = feature.props ?? {};
+  const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
+  return (
+    <>
+      <h3>{feature.label ?? 'Route'}</h3>
+      <dl>
+        {str(p.towards) && <Row term="Towards">{str(p.towards)}</Row>}
+        {str(p.operator) && <Row term="Operator">{str(p.operator)}</Row>}
+        <Row term="Timetable">{timeFormat.format(new Date(feature.ts))}</Row>
+        <Row term="Source">Västtrafik GTFS via Trafiklab (CC0)</Row>
+      </dl>
+      <p className="approx-note">
+        The most common path for this line and direction; some trips take other routes.
+      </p>
+    </>
+  );
+}
+
 function TravelTimeDetails({ feature }: { feature: Feature }) {
   const p = feature.props ?? {};
   const num = (v: unknown) => (typeof v === 'number' ? v : undefined);
@@ -532,6 +552,9 @@ export function SelectionCard({ selection, items, tracking, onShow, onClose }: S
           {isEvent(item) && <EventDetails event={item} />}
           {isFeature(item) && item.kind === 'traffic' && <TrafficDetails feature={item} />}
           {isFeature(item) && item.kind === 'travel-time' && <TravelTimeDetails feature={item} />}
+          {isFeature(item) && item.kind === 'transit-route' && (
+            <TransitRouteDetails feature={item} />
+          )}
           {isArea(item) && <AreaDetails area={item} />}
           {at && onShow && <NearestCamera at={at} onShow={onShow} />}
         </article>
