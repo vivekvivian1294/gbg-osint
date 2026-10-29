@@ -33,6 +33,7 @@ import {
   trafikverketTrains,
 } from './trafikverket';
 import { vasttrafikDepartures, vasttrafikVehicles } from './vasttrafik';
+import { wikipediaNearby } from './wikipedia';
 
 /** Every data source the server runs. Each connector lives in its own file next to this one. */
 export const connectors: readonly Connector[] = [
@@ -77,4 +78,5 @@ export const connectors: readonly Connector[] = [
   flightRoutes,
   vivaHarbour,
   metNowcast,
+  wikipediaNearby,
 ];

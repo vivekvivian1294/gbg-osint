@@ -457,18 +457,21 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - Weather and environment (temperature, gusts, rain nowcast, poor air quality, ice or snow on roads), and energy (spot price and renewable share).
 - ✅ **Anomaly flags:** a robust z-score (median and MAD) of the latest value against the last 24 hours, for road and city traffic incidents, police events, rail disruptions, late departures, sea level and gusts. A flag needs 3 hours of history, |z| ≥ 3.5 and a minimum absolute change, and is labelled as a statistical flag, not an alarm. River levels above their limits appear in the harbour section.
 
-**6.4 Analyst tools**
-- **"What's here?" spot report:** right-click or long-press a point to see:
-  - its district statistics;
-  - nearby Wikipedia articles (geosearch ✓, Swedish and English);
-  - the nearest road cameras and street-level photos;
-  - events within 500 m;
-  - a "route from here" button.
-- **Nearest camera** *(GEV)*: from a selected ship, tram, incident or slow road stretch, open the closest Trafikverket camera image.
-- **Watch areas:**
-  - Draw an area with the existing tools.
-  - Get browser notifications when an event appears inside it, or a ship or train enters it.
-  - Stored in the browser only; objects, never people.
+**6.4 Analyst tools** (spot report, nearest camera and watch areas ✅ done; the rest open)
+- ✅ **"What's here?" spot report:** right-click, long-press on touch screens, or `W` for the centre of the view. The card shows:
+  - incidents, disruptions and warnings with a precise place within 500 m (the five nearest, with "show all"), each one clickable;
+  - the nearest Trafikverket road camera within 5 km with its latest image;
+  - up to four street-level photos within 250 m (Panoramax, KartaView);
+  - nearby Wikipedia articles in Swedish and English (geosearch within 1 km through the server, throttled and cached for a day, Gothenburg area only);
+  - the SCB RegSO district and its statistics;
+  - "Route from here" (opens the route tool with A set) and "Drop a pin".
+  - The server answers `GET /api/spot?lon=&lat=` from its live store, so it works whether or not those layers are on.
+- ✅ **Nearest camera** *(GEV)*: selection cards for vehicles, ships, aircraft, events with a precise place and road stretches have a "Nearest road camera" button that shows the closest camera's image, distance and a link to select it.
+- ✅ **Watch areas:**
+  - A fourth tool, *Watch*: click around an area, name it and save it. Areas are drawn in red and kept in this browser only.
+  - While the app is open it alerts when an incident with a precise place appears inside, or a named ship or live train enters (the first look only records what is already there; the same object is not alerted again within 30 minutes). Police events (municipality only), news and social posts are not watched, nor are anonymised leisure craft.
+  - Alerts appear as a toast, in a "Recent alerts" list in the tool (click to show on the map) and, if allowed, as browser notifications.
+  - The app subscribes to the watched channels in the background, without turning their layers on.
 - **Feed filters:** by category, severity, time window, "in view" and "in watch area".
 - **Fly the route** *(GEV)*: turn an A→B route into a camera tour.
 - **Scene files** *(GEV)*: import and export tours as files.
@@ -499,7 +502,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 1. 6.1 quick wins. ✅
 2. ViVa stations, ships to Gothenburg and airport weather (harbour and airport picture). ✅
 3. 24-hour memory with sparklines, the situation brief and the delay index. ✅
-4. Spot report, nearest camera and watch areas.
+4. Spot report, nearest camera and watch areas. ✅
 5. Weather extras and seasonal layers.
 6. The 6.5 items as keys arrive.
 

@@ -13,9 +13,10 @@ const SHORTCUTS: readonly [string, string][] = [
   ['/', 'Search'],
   ['B', 'Departure boards'],
   ['N', 'Now in Gothenburg (situation brief)'],
+  ['W', "What's here? at the centre of the view (or right-click, or long-press)"],
   ['M', 'Missions'],
   ['S', 'Scene director (camera tours)'],
-  ['G', 'Map tools: measure, pins, route A→B'],
+  ['G', 'Map tools: measure, pins, route A→B, watch areas'],
   ['Esc', 'Leave the tool, stop tracking and tours, clear the selection'],
   ['?', 'This help'],
 ];

@@ -67,6 +67,11 @@ export class LiveClient {
     return [...(this.data.get(channel)?.values() ?? [])];
   }
 
+  /** Whether the channel's first snapshot has arrived. */
+  loaded(channel: string): boolean {
+    return this.data.has(channel);
+  }
+
   /** Increments whenever the channel's items change. */
   version(channel: string): number {
     return this.versions.get(channel) ?? 0;

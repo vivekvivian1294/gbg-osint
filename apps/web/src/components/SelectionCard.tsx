@@ -1,31 +1,44 @@
 import {
+  decodeLine,
   ENTITY_SERIES,
+  geometryVertices,
   isArea,
   isEntity,
   isEvent,
   isFeature,
+  SpotReportSchema,
   type Area,
+  type BriefTarget,
   type ChannelItem,
   type Entity,
   type Feature,
   type GeoEvent,
+  type LonLat,
+  type SpotReport,
 } from '@gbg-osint/shared';
 import { useState, type ReactNode } from 'react';
 import type { PickRef } from '../engine/markerSpec';
 import { flowRatio } from '../engine/travelTimes';
 import type { Contact } from '../layers/contacts';
 import { DISTRICT_METRICS } from '../layers/districts';
+import { formatDistance } from '../layers/measure';
 import { LAYER_BY_ID } from '../layers/registry';
+import { fetchJson } from '../state/api';
 import { useFlightRoute } from '../state/flightRoutes';
 import { useSeries } from '../state/history';
+import { spotUrl } from '../state/spot';
 import { Sparkline } from './Sparkline';
 
 interface SelectionCardProps {
   selection: PickRef;
   items: readonly ChannelItem[];
   tracking?: TrackingControls;
+  /** Selects another item on the map (used by the nearest-camera lookup). */
+  onShow?(target: BriefTarget): void;
   onClose(): void;
 }
+
+const PRECISE_PLACE = new Set(['exact', 'area']);
 
 const timeFormat = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Europe/Stockholm',
@@ -84,7 +97,7 @@ const PROP_LABELS: Record<string, string> = {
 };
 const CAMERA_PHOTO = /^https:\/\/api\.trafikinfo\.trafikverket\.se\/[\w./-]+\.jpg$/i;
 
-function CameraPhoto({ entity }: { entity: Entity }) {
+export function CameraPhoto({ entity }: { entity: Entity }) {
   const url = entity.props?.photoUrl;
   if (typeof url !== 'string' || !CAMERA_PHOTO.test(url)) return null;
   const taken = Date.parse(entity.ts);
@@ -104,7 +117,7 @@ function CameraPhoto({ entity }: { entity: Entity }) {
   );
 }
 
-function Row({ term, children }: { term: string; children: ReactNode }) {
+export function Row({ term, children }: { term: string; children: ReactNode }) {
   return (
     <div className="dl-row">
       <dt>{term}</dt>
@@ -113,7 +126,7 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
   );
 }
 
-const PHOTO_PATH =
+export const PHOTO_PATH =
   /^\/api\/data\/streetphotos\/img\/\d{4,5}\/\d{4,5}\/(?:pnx|kv)-[a-f0-9-]+\/(?:thumb|image)\.jpg$/;
 const PROVIDERS: Record<string, string> = { panoramax: 'Panoramax', kartaview: 'KartaView' };
 const LICENCES: Record<string, string> = {
@@ -289,7 +302,7 @@ function EventDetails({ event }: { event: GeoEvent }) {
   );
 }
 
-function AreaDetails({ area }: { area: Area }) {
+export function AreaDetails({ area }: { area: Pick<Area, 'id' | 'label' | 'props'> }) {
   const p = area.props ?? {};
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
   return (
@@ -412,9 +425,70 @@ function ContactList({ tracking, current }: { tracking: TrackingControls; curren
   );
 }
 
-export function SelectionCard({ selection, items, tracking, onClose }: SelectionCardProps) {
+/** Where to look for a camera from: the object, the event's place or the middle of a stretch. */
+export function positionOf(item: ChannelItem): LonLat | undefined {
+  if (isEntity(item)) {
+    return item.kind === 'camera' || item.kind === 'photo' ? undefined : [item.lon, item.lat];
+  }
+  if (isEvent(item)) {
+    return item.geometry && PRECISE_PLACE.has(item.locationPrecision)
+      ? geometryVertices(item.geometry)[0]
+      : undefined;
+  }
+  if (isFeature(item)) {
+    const line = decodeLine(item.line);
+    return line[Math.floor(line.length / 2)];
+  }
+  return undefined;
+}
+
+type Nearest = SpotReport['cameras'][number] | null | 'idle' | 'loading';
+
+/** On request, the closest Trafikverket road camera and its latest image. */
+function NearestCamera({ at, onShow }: { at: LonLat; onShow(target: BriefTarget): void }) {
+  const [nearest, setNearest] = useState<Nearest>('idle');
+  const load = () => {
+    setNearest('loading');
+    fetchJson(spotUrl(at), SpotReportSchema).then(
+      (r) => setNearest(r.cameras[0] ?? null),
+      () => setNearest(null),
+    );
+  };
+  if (nearest === 'idle') {
+    return (
+      <div className="selection-actions">
+        <button type="button" onClick={load}>
+          Nearest road camera
+        </button>
+      </div>
+    );
+  }
+  if (nearest === 'loading') return <p className="muted">Looking for a road camera…</p>;
+  if (!nearest) return <p className="muted">No road camera within 5 km.</p>;
+  const cam = nearest.entity;
+  return (
+    <section className="nearest-camera" aria-label="Nearest road camera">
+      <h3>
+        {cam.label ?? 'Road camera'}{' '}
+        <span className="muted">{formatDistance(nearest.distanceM)} away</span>
+      </h3>
+      <CameraPhoto entity={cam} />
+      <button
+        type="button"
+        onClick={() =>
+          onShow({ channel: nearest.channel, ids: [cam.id], lon: cam.lon, lat: cam.lat })
+        }
+      >
+        Show camera on map
+      </button>
+    </section>
+  );
+}
+
+export function SelectionCard({ selection, items, tracking, onShow, onClose }: SelectionCardProps) {
   const layer = LAYER_BY_ID.get(selection.layerId);
   const single = items.length === 1 && isEntity(items[0]!);
+  const at = items.length === 1 ? positionOf(items[0]!) : undefined;
   return (
     <aside className="selection" aria-labelledby="selection-title">
       <header>
@@ -439,6 +513,7 @@ export function SelectionCard({ selection, items, tracking, onClose }: Selection
           {isFeature(item) && item.kind === 'traffic' && <TrafficDetails feature={item} />}
           {isFeature(item) && item.kind === 'travel-time' && <TravelTimeDetails feature={item} />}
           {isArea(item) && <AreaDetails area={item} />}
+          {at && onShow && <NearestCamera at={at} onShow={onShow} />}
         </article>
       ))}
       {single && tracking?.trackable && (

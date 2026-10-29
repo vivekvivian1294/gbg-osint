@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   formatArea,
   formatDistance,
@@ -6,11 +7,13 @@ import {
   polygonAreaM2,
 } from '../layers/measure';
 import type { RouteProfile, ToolMode, ToolsApi } from '../state/tools';
+import type { WatchAlert } from '../state/watch';
 
 const MODES: readonly [ToolMode, string][] = [
   ['measure', 'Measure'],
   ['pin', 'Pins'],
   ['route', 'Route A→B'],
+  ['watch', 'Watch'],
 ];
 const PROFILES: readonly [RouteProfile, string][] = [
   ['foot', 'Walk'],
@@ -18,8 +21,8 @@ const PROFILES: readonly [RouteProfile, string][] = [
   ['car', 'Car'],
 ];
 
-/** Measure, pin and route tools; while one is active, map clicks place points. */
-export function ToolsPanel({ tools, onClose }: { tools: ToolsApi; onClose(): void }) {
+/** Measure, pin, route and watch tools; while one is active, map clicks place points. */
+export function ToolsPanel({ tools, watch, onClose }: ToolsPanelProps) {
   const { mode, measure, pins, routeEnds, route } = tools;
   return (
     <section className="tools-panel" aria-label="Map tools">
@@ -110,7 +113,109 @@ export function ToolsPanel({ tools, onClose }: { tools: ToolsApi; onClose(): voi
         </div>
       )}
 
+      {mode === 'watch' && <WatchTool tools={tools} watch={watch} />}
+
       {!mode && <p className="muted tool-body">Pick a tool. Esc leaves the tool.</p>}
     </section>
+  );
+}
+
+export type NotificationState = NotificationPermission | 'unsupported';
+
+export interface WatchControls {
+  alerts: readonly WatchAlert[];
+  notifications: NotificationState;
+  onEnableNotifications(): void;
+  onShowAlert(alert: WatchAlert): void;
+}
+
+interface ToolsPanelProps {
+  tools: ToolsApi;
+  watch: WatchControls;
+  onClose(): void;
+}
+
+const alertTime = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Europe/Stockholm',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function WatchTool({ tools, watch }: { tools: ToolsApi; watch: WatchControls }) {
+  const [name, setName] = useState('');
+  const { watchDraft: draft, watchAreas: areas } = tools;
+  return (
+    <div className="tool-body">
+      <p className="muted">
+        Click three or more points around an area and save it. You get an alert when an incident
+        appears inside it or a ship or train enters. Areas stay in this browser, and alerts only
+        come while the app is open.
+      </p>
+      <form
+        className="watch-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (tools.saveWatch(name)) setName('');
+        }}
+      >
+        <input
+          type="text"
+          value={name}
+          maxLength={40}
+          placeholder={`Area ${areas.length + 1}`}
+          aria-label="Name of the watch area"
+          onChange={(e) => setName(e.target.value)}
+        />
+        <button type="submit" disabled={draft.length < 3}>
+          Save area
+        </button>
+        <button type="button" onClick={() => tools.clear('watch')} disabled={draft.length === 0}>
+          Clear
+        </button>
+      </form>
+      {areas.length > 0 && (
+        <ul className="watch-areas">
+          {areas.map((a) => (
+            <li key={a.id}>
+              <span>{a.name}</span>
+              <button
+                type="button"
+                onClick={() => tools.removeWatch(a.id)}
+                aria-label={`Delete ${a.name}`}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {watch.notifications === 'default' && (
+        <button type="button" onClick={watch.onEnableNotifications}>
+          Allow browser notifications
+        </button>
+      )}
+      {watch.notifications === 'denied' && (
+        <p className="muted small">
+          Browser notifications are blocked; alerts show in the app only.
+        </p>
+      )}
+      {watch.alerts.length > 0 && (
+        <>
+          <h3 className="watch-title">Recent alerts</h3>
+          <ul className="spot-list">
+            {watch.alerts.map((a) => (
+              <li key={a.id}>
+                <button type="button" onClick={() => watch.onShowAlert(a)}>
+                  <span>{a.text}</span>
+                  <span className="muted">
+                    {a.areaName} · {alertTime.format(new Date(a.ts))}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }

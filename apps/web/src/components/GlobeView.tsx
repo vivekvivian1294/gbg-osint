@@ -1,5 +1,6 @@
-import type { ClientConfig, Feature, Frame, Track } from '@gbg-osint/shared';
+import type { ClientConfig, Feature, Frame, LonLat, Track } from '@gbg-osint/shared';
 import {
+  Cartesian2,
   Cartographic,
   Math as CesiumMath,
   ScreenSpaceEventHandler,
@@ -35,6 +36,8 @@ export interface GlobeHandle {
   stopTour(): void;
   radarPlay(playing: boolean): void;
   radarSeek(index: number): void;
+  /** The ground point at the centre of the view, if the globe is there. */
+  centre(): LonLat | null;
 }
 
 /** Line features of one active layer; `version` changes whenever the features do. */
@@ -75,6 +78,15 @@ const OVERLAY_COLORS: Record<StyleId, string> = {
 
 const STATS_INTERVAL_MS = 500;
 const BUILDING_REFRESH_MS = 1_000;
+const LONG_PRESS_MS = 600;
+const LONG_PRESS_SLOP_PX = 10;
+
+function groundAt(globe: CesiumWidget, position: Cartesian2): LonLat | null {
+  const ground = globe.camera.pickEllipsoid(position);
+  if (!ground) return null;
+  const c = Cartographic.fromCartesian(ground);
+  return [CesiumMath.toDegrees(c.longitude), CesiumMath.toDegrees(c.latitude)];
+}
 
 interface GlobeViewProps {
   ref?: Ref<GlobeHandle>;
@@ -106,6 +118,8 @@ interface GlobeViewProps {
   onCameraSettled(state: CameraState): void;
   onPick(pick: PickRef | null): void;
   onMapClick(lon: number, lat: number): void;
+  /** Right-click, or a long press on touch screens: "What's here?". */
+  onSpot(lon: number, lat: number): void;
   onTrackLost(): void;
 }
 
@@ -209,18 +223,49 @@ export function GlobeView(props: GlobeViewProps) {
     const handler = new ScreenSpaceEventHandler(scene.canvas);
     handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
       if (latest.current.toolActive) {
-        const ground = camera.pickEllipsoid(e.position);
-        if (!ground) return;
-        const c = Cartographic.fromCartesian(ground);
-        latest.current.onMapClick(
-          CesiumMath.toDegrees(c.longitude),
-          CesiumMath.toDegrees(c.latitude),
-        );
+        const p = groundAt(globe, e.position);
+        if (p) latest.current.onMapClick(p[0], p[1]);
         return;
       }
       const picked: unknown = scene.pick(e.position);
       latest.current.onPick(renderer.resolvePick(picked) ?? engine.traffic.pickOf(picked) ?? null);
     }, ScreenSpaceEventType.LEFT_CLICK);
+    handler.setInputAction((e: ScreenSpaceEventHandler.PositionedEvent) => {
+      const p = groundAt(globe, e.position);
+      if (p) latest.current.onSpot(p[0], p[1]);
+    }, ScreenSpaceEventType.RIGHT_CLICK);
+    const noMenu = (e: Event) => e.preventDefault();
+    scene.canvas.addEventListener('contextmenu', noMenu);
+
+    // A still finger held down asks "What's here?"; any movement or a second finger cancels.
+    const touches = new Map<number, { x: number; y: number }>();
+    let pressTimer: number | undefined;
+    const cancelPress = () => window.clearTimeout(pressTimer);
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      cancelPress();
+      if (touches.size !== 1) return;
+      pressTimer = window.setTimeout(() => {
+        const rect = scene.canvas.getBoundingClientRect();
+        const p = groundAt(globe, new Cartesian2(e.clientX - rect.left, e.clientY - rect.top));
+        if (p) latest.current.onSpot(p[0], p[1]);
+      }, LONG_PRESS_MS);
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      const start = touches.get(e.pointerId);
+      if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > LONG_PRESS_SLOP_PX) {
+        cancelPress();
+      }
+    };
+    const onPointerEnd = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      cancelPress();
+    };
+    scene.canvas.addEventListener('pointerdown', onPointerDown);
+    scene.canvas.addEventListener('pointermove', onPointerMove);
+    scene.canvas.addEventListener('pointerup', onPointerEnd);
+    scene.canvas.addEventListener('pointercancel', onPointerEnd);
     // Any drag or zoom hands the camera back to the user.
     const stopTour = () => engine.tours.stop();
     scene.canvas.addEventListener('pointerdown', stopTour);
@@ -261,6 +306,12 @@ export function GlobeView(props: GlobeViewProps) {
     return () => {
       cancelAnimationFrame(frame);
       handler.destroy();
+      cancelPress();
+      scene.canvas.removeEventListener('contextmenu', noMenu);
+      scene.canvas.removeEventListener('pointerdown', onPointerDown);
+      scene.canvas.removeEventListener('pointermove', onPointerMove);
+      scene.canvas.removeEventListener('pointerup', onPointerEnd);
+      scene.canvas.removeEventListener('pointercancel', onPointerEnd);
       scene.canvas.removeEventListener('pointerdown', stopTour);
       scene.canvas.removeEventListener('wheel', stopTour);
       for (const remove of removers) remove();
@@ -421,6 +472,15 @@ export function GlobeView(props: GlobeViewProps) {
       },
       radarSeek(index) {
         engineRef.current?.radar.seek(index);
+      },
+      centre() {
+        const engine = engineRef.current;
+        if (!engine) return null;
+        const canvas = engine.globe.scene.canvas;
+        return groundAt(
+          engine.globe,
+          new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2),
+        );
       },
     }),
     [],

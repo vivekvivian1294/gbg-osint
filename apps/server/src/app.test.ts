@@ -1,4 +1,4 @@
-import { BriefSchema, type ServerMessage } from '@gbg-osint/shared';
+import { BriefSchema, SpotReportSchema, type ServerMessage } from '@gbg-osint/shared';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -145,6 +145,27 @@ describe('HTTP API', () => {
       '/api/history/track/maritime.ships/a%20b',
     ]) {
       expect((await app.inject(path)).statusCode, path).toBe(404);
+    }
+  });
+
+  it('serves a spot report and rejects malformed coordinates', async () => {
+    const { app } = await setup();
+    const spot = await app.inject('/api/spot?lon=11.9688&lat=57.7072');
+    expect(spot.statusCode).toBe(200);
+    expect(SpotReportSchema.parse(spot.json())).toEqual({
+      lon: 11.9688,
+      lat: 57.7072,
+      events: [],
+      cameras: [],
+    });
+    for (const query of [
+      '',
+      '?lon=11.9',
+      '?lon=abc&lat=57',
+      '?lon=1e3&lat=57',
+      '?lon=200&lat=57',
+    ]) {
+      expect((await app.inject(`/api/spot${query}`)).statusCode, query).toBe(404);
     }
   });
 

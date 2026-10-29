@@ -19,19 +19,24 @@ import {
   type Scene,
 } from 'cesium';
 
-/** What the measure, pin and route tools have drawn. */
+/** What the measure, pin, route and watch tools have drawn, plus the "What's here?" point. */
 export interface Drawing {
   measure: readonly LonLat[];
   measureLabel: string;
   pins: readonly LonLat[];
   routeEnds: readonly LonLat[];
   routeLine: readonly LonLat[];
+  watchDraft: readonly LonLat[];
+  watchAreas: readonly { name: string; ring: readonly LonLat[] }[];
+  spot?: LonLat;
 }
 
 const LIFT_M = 1.5;
 const MEASURE = Color.fromCssColorString('#fbbf24');
 const ROUTE = Color.fromCssColorString('#f472b6');
 const PIN = Color.fromCssColorString('#38bdf8');
+const WATCH = Color.fromCssColorString('#f87171');
+const SPOT = Color.fromCssColorString('#ffffff');
 const ON_TOP = Number.POSITIVE_INFINITY;
 const LABEL_OFFSET = new Cartesian2(0, -14);
 
@@ -57,7 +62,26 @@ function line(points: readonly LonLat[], color: Color, width: number): Primitive
   });
 }
 
-/** Draws measurements, pins and routes on top of the map. */
+function fill(points: readonly LonLat[], color: Color): Primitive {
+  return new Primitive({
+    geometryInstances: new GeometryInstance({
+      geometry: new PolygonGeometry({
+        polygonHierarchy: new PolygonHierarchy(positions(points)),
+        height: LIFT_M,
+        vertexFormat: PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
+      }),
+      attributes: { color: ColorGeometryInstanceAttribute.fromColor(color) },
+    }),
+    appearance: new PerInstanceColorAppearance({ flat: true, translucent: true }),
+    asynchronous: false,
+    allowPicking: false,
+  });
+}
+
+const northernmost = (ring: readonly LonLat[]): LonLat =>
+  ring.reduce((top, p) => (p[1] > top[1] ? p : top), ring[0]!);
+
+/** Draws measurements, pins, routes and watch areas on top of the map. */
 export class ToolLayer {
   private readonly points: PointPrimitiveCollection;
   private readonly labels: LabelCollection;
@@ -92,29 +116,20 @@ export class ToolLayer {
         disableDepthTestDistance: ON_TOP,
       });
 
-    if (d.measure.length >= 3) {
-      this.add(
-        new Primitive({
-          geometryInstances: new GeometryInstance({
-            geometry: new PolygonGeometry({
-              polygonHierarchy: new PolygonHierarchy(positions(d.measure)),
-              height: LIFT_M,
-              vertexFormat: PerInstanceColorAppearance.FLAT_VERTEX_FORMAT,
-            }),
-            attributes: {
-              color: ColorGeometryInstanceAttribute.fromColor(MEASURE.withAlpha(0.15)),
-            },
-          }),
-          appearance: new PerInstanceColorAppearance({ flat: true, translucent: true }),
-          asynchronous: false,
-          allowPicking: false,
-        }),
-      );
-    }
+    if (d.measure.length >= 3) this.add(fill(d.measure, MEASURE.withAlpha(0.15)));
     if (d.measure.length >= 2) this.add(line(d.measure, MEASURE, 3));
     d.measure.forEach((p) => point(p, MEASURE, 8));
     const last = d.measure.at(-1);
     if (last && d.measureLabel) label(last, d.measureLabel);
+
+    for (const area of d.watchAreas) {
+      this.add(fill(area.ring, WATCH.withAlpha(0.08)));
+      this.add(line([...area.ring, area.ring[0]!], WATCH, 2));
+      label(northernmost(area.ring), area.name);
+    }
+    if (d.watchDraft.length >= 3) this.add(fill(d.watchDraft, WATCH.withAlpha(0.15)));
+    if (d.watchDraft.length >= 2) this.add(line(d.watchDraft, WATCH, 3));
+    d.watchDraft.forEach((p) => point(p, WATCH, 8));
 
     d.pins.forEach((p, i) => {
       point(p, PIN, 12);
@@ -126,6 +141,10 @@ export class ToolLayer {
       point(p, ROUTE, 12);
       label(p, i === 0 ? 'A' : 'B');
     });
+    if (d.spot) {
+      point(d.spot, SPOT, 14);
+      label(d.spot, "What's here?");
+    }
     this.scene.requestRender();
   }
 

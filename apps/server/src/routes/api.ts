@@ -4,6 +4,7 @@ import { buildBrief } from '../core/brief';
 import type { History } from '../core/history';
 import { UpstreamError } from '../core/http';
 import type { Scheduler } from '../core/scheduler';
+import { spotReport } from '../core/spot';
 import type { ChannelStore } from '../core/store';
 
 const CONNECTOR_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;
@@ -14,6 +15,7 @@ const MAX_DATA_PATH = 200;
 const HISTORY_PREFIX = /^[a-z0-9]+(?:\.[a-z0-9_-]+)+\/(?:[A-Za-z0-9_.:-]{1,128}\/)?$/;
 const MAX_HISTORY_PREFIX = 200;
 const ITEM_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
+const COORD = /^-?\d{1,3}(?:\.\d{1,7})?$/;
 
 export interface ApiDeps {
   store: ChannelStore;
@@ -42,6 +44,16 @@ export function registerApiRoutes(app: FastifyInstance, deps: ApiDeps): void {
   app.get('/api/channels', async () => deps.store.list());
 
   app.get('/api/brief', async () => buildBrief(deps.store, deps.history, Date.now()));
+
+  app.get<{ Querystring: { lon?: string; lat?: string } }>('/api/spot', async (request, reply) => {
+    const { lon = '', lat = '' } = request.query;
+    const x = Number(lon);
+    const y = Number(lat);
+    if (!COORD.test(lon) || !COORD.test(lat) || Math.abs(x) > 180 || Math.abs(y) > 90) {
+      return reply.code(404).send({ error: 'Not Found' });
+    }
+    return spotReport(deps.store, x, y);
+  });
 
   app.get<{ Querystring: { prefix?: string } }>('/api/history/series', async (request, reply) => {
     const prefix = request.query.prefix ?? '';

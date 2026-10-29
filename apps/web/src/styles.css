@@ -884,6 +884,128 @@ select option {
   background: rgba(94, 234, 212, 0.08);
 }
 
+/* "What's here?", nearest camera and watch areas */
+
+.spot {
+  max-height: 60vh;
+  border-color: #ffffff;
+}
+
+.spot-coords {
+  font: 12px var(--mono);
+  color: var(--muted);
+}
+
+.spot-section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.spot-section h3,
+.watch-title,
+.nearest-camera h3 {
+  margin: 0 0 4px;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.spot-section h3 .muted,
+.nearest-camera h3 .muted {
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.spot-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spot-list li {
+  margin-bottom: 3px;
+}
+
+.spot-list button {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 2px 4px;
+  text-align: left;
+  border: none;
+}
+
+.spot-list button:hover,
+.spot-list button:focus-visible {
+  background: rgba(94, 234, 212, 0.08);
+}
+
+.spot-list .muted {
+  font: 11px var(--mono);
+}
+
+.spot-photos {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.spot-photos img {
+  display: block;
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+}
+
+.nearest-camera {
+  margin-top: 8px;
+}
+
+.watch-form {
+  display: flex;
+  gap: 4px;
+}
+
+.watch-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+}
+
+.watch-areas {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.watch-areas li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--danger);
+}
+
+.watch-areas button {
+  padding: 0 6px;
+  border: none;
+}
+
+.watch-title {
+  margin-top: 4px;
+}
+
 /* Bottom bar clock */
 
 .bottombar .clock {
@@ -1065,7 +1187,7 @@ kbd {
 .tools-panel {
   top: calc(var(--topbar-h) + var(--gap));
   left: calc(var(--left-inset, var(--gap)) + var(--gap));
-  width: 280px;
+  width: 330px;
 }
 
 .tools-panel header {

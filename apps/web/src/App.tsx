@@ -12,6 +12,7 @@ import {
   type ChannelItem,
   type ChannelKind,
   type ClientConfig,
+  type LonLat,
   type RadioStation,
 } from '@gbg-osint/shared';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
@@ -37,9 +38,10 @@ import { RadarTimeline, TourBar } from './components/Playbars';
 import { RadioPanel } from './components/RadioPanel';
 import { ScenesDialog } from './components/ScenesDialog';
 import { SelectionCard } from './components/SelectionCard';
+import { SpotReport } from './components/SpotReport';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { StatusDialog } from './components/StatusDialog';
-import { ToolsPanel } from './components/ToolsPanel';
+import { ToolsPanel, type NotificationState } from './components/ToolsPanel';
 import { TopBar, type RightPanel } from './components/TopBar';
 import { DEFAULT_BASEMAP, STYLE_IDS, type BasemapId, type StyleId } from './config';
 import { basemapAvailable } from './engine/basemaps';
@@ -73,6 +75,8 @@ import { LiveClient } from './state/live';
 import { createStore } from './state/store';
 import { useStreetPhotos } from './state/streetPhotos';
 import { useTools } from './state/tools';
+import { useSpot } from './state/spot';
+import { Watcher, watchChannels, type WatchAlert } from './state/watch';
 import { parseHash, writeHash, type UrlState } from './state/urlState';
 import { addKeyframe, loadRecording, recordedTour, saveRecording } from './tours';
 
@@ -83,6 +87,9 @@ const DENSITIES: readonly number[] = [1, 0.5, 0.25];
 const SEARCH_VIEW_HEIGHT_M = 2500;
 const BRIEF_VIEW_HEIGHT_M = 3000;
 const TOAST_MS = 2500;
+const MAX_ALERTS = 30;
+/** Browser notifications per batch; the rest are listed in the Watch tool. */
+const MAX_NOTIFICATIONS = 3;
 const PHOTO_CHANNEL = 'photos.street';
 /** Layers whose objects have a sensible cab or bow view. */
 const RIDE_LAYERS = new Set(['transit', 'ships', 'aircraft']);
@@ -152,6 +159,13 @@ export function App() {
   const tools = useTools();
   const [rosterRefs, setRosterRefs] = useState<TrackRef[] | null>(null);
   const [toast, setToast] = useState('');
+  const [spot, setSpot] = useState<LonLat | null>(null);
+  const spotData = useSpot(spot);
+  const [watcher] = useState(() => new Watcher());
+  const [alerts, setAlerts] = useState<WatchAlert[]>([]);
+  const [notifications, setNotifications] = useState<NotificationState>(() =>
+    'Notification' in window ? Notification.permission : 'unsupported',
+  );
   const toastTimer = useRef<number | undefined>(undefined);
   const globeRef = useRef<GlobeHandle>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -201,9 +215,43 @@ export function App() {
   const isActive = (layerId: string) => activeLayers.some((l) => l.id === layerId);
   const photos = useStreetPhotos(isActive('street-photos'), camera);
 
+  const watching = tools.watchAreas.length > 0;
+  const watchList = useMemo(
+    () => (watching ? watchChannels(channelKinds) : []),
+    [watching, channelKinds],
+  );
+  const subscribed = useMemo(
+    () => [...new Set([...liveChannels, ...watchList])],
+    [liveChannels, watchList],
+  );
+
   useEffect(() => {
-    live.setChannels(liveChannels);
-  }, [live, liveChannels]);
+    live.setChannels(subscribed);
+  }, [live, subscribed]);
+
+  // Watch areas are checked whenever a watched channel changes, outside React's render.
+  const watchState = useRef({ areas: tools.watchAreas, channels: watchList });
+  const onAlerts = useRef<(found: WatchAlert[]) => void>(() => undefined);
+  useEffect(() => {
+    watchState.current = { areas: tools.watchAreas, channels: watchList };
+  });
+  useEffect(() => {
+    let lastKey = '';
+    return live.subscribe(() => {
+      const { areas, channels } = watchState.current;
+      if (areas.length === 0) return;
+      const loaded = channels.filter((c) => live.loaded(c));
+      const key = `${areas.map((a) => a.id).join()}|${loaded.map((c) => `${c}:${live.version(c)}`).join()}`;
+      if (key === lastKey) return;
+      lastKey = key;
+      const found = watcher.update(
+        areas,
+        loaded.map((channel) => ({ channel, items: live.items(channel) })),
+        Date.now(),
+      );
+      if (found.length > 0) onAlerts.current(found);
+    });
+  }, [live, watcher]);
 
   useEffect(() => {
     writeHash({
@@ -389,7 +437,8 @@ export function App() {
     globeRef.current?.flyTo(target);
   };
   const resetView = () => flyTo(homeCamera());
-  const showBriefTarget = (target: BriefTarget) => {
+  const showTarget = (target: BriefTarget) => {
+    setSpot(null);
     const layer = LAYERS.find((l) => l.channels.includes(target.channel));
     if (layer && !enabled.has(layer.id)) toggleLayer(layer.id);
     if (target.lon !== undefined && target.lat !== undefined) {
@@ -404,6 +453,33 @@ export function App() {
     window.clearTimeout(toastTimer.current);
     setToast(message);
     toastTimer.current = window.setTimeout(() => setToast(''), TOAST_MS);
+  };
+  const openSpot = (point: LonLat) => {
+    setSpot(point);
+    setSelection(null);
+  };
+  const drawing = useMemo(
+    () => (spot ? { ...tools.drawing, spot } : tools.drawing),
+    [tools.drawing, spot],
+  );
+  useEffect(() => {
+    onAlerts.current = (found) => {
+      setAlerts((prev) => [...[...found].reverse(), ...prev].slice(0, MAX_ALERTS));
+      const latest = found.at(-1)!;
+      showToast(`${latest.areaName}: ${latest.text}`);
+      if (notifications !== 'granted') return;
+      for (const a of found.slice(0, MAX_NOTIFICATIONS)) {
+        try {
+          new Notification(`Watch area: ${a.areaName}`, { body: a.text, tag: a.id });
+        } catch {
+          // Some mobile browsers only allow notifications from a service worker.
+        }
+      }
+    };
+  });
+  const enableNotifications = () => {
+    if (!('Notification' in window)) return;
+    void Notification.requestPermission().then(setNotifications);
   };
   const share = () => {
     navigator.clipboard.writeText(window.location.href).then(
@@ -538,6 +614,12 @@ export function App() {
         case '?':
           setDialog('help');
           break;
+        case 'w':
+        case 'W': {
+          const centre = globeRef.current?.centre();
+          if (centre) openSpot(centre);
+          break;
+        }
         case '/':
           e.preventDefault();
           searchRef.current?.focus();
@@ -550,6 +632,7 @@ export function App() {
           globeRef.current?.stopTour();
           stopTracking();
           setSelection(null);
+          setSpot(null);
           break;
         case 'ArrowRight':
         case 'ArrowLeft':
@@ -596,7 +679,7 @@ export function App() {
         buildings={isActive('buildings')}
         cameraViews={cameraViews}
         districts={districtFill}
-        drawing={tools.drawing}
+        drawing={drawing}
         toolActive={toolsOpen && tools.mode !== null}
         ride={ride}
         cameraStore={cameraStore}
@@ -604,7 +687,11 @@ export function App() {
         radarStore={radarStore}
         tourStore={tourStore}
         onCameraSettled={setCamera}
-        onPick={setSelection}
+        onPick={(pick) => {
+          setSelection(pick);
+          setSpot(null);
+        }}
+        onSpot={(lon, lat) => openSpot([lon, lat])}
         onMapClick={(lon, lat) => tools.click([lon, lat])}
         onTrackLost={() => {
           stopTracking();
@@ -701,7 +788,7 @@ export function App() {
             />
           )}
           {panels.right === 'radio' && <RadioPanel playing={radio} onPlay={setRadio} />}
-          {panels.right === 'brief' && <BriefPanel onShow={showBriefTarget} />}
+          {panels.right === 'brief' && <BriefPanel onShow={showTarget} />}
         </aside>
       )}
       {radio && (
@@ -717,6 +804,13 @@ export function App() {
       {toolsOpen && (
         <ToolsPanel
           tools={tools}
+          watch={{
+            alerts,
+            notifications,
+            onEnableNotifications: enableNotifications,
+            onShowAlert: (a) =>
+              showTarget({ channel: a.channel, ids: [a.itemId], lon: a.lon, lat: a.lat }),
+          }}
           onClose={() => {
             tools.setMode(null);
             setToolsOpen(false);
@@ -724,10 +818,29 @@ export function App() {
         />
       )}
       {districts && <DistrictLegend classes={districts} onMetricChange={setDistrictMetric} />}
-      {cardSelection && (
+      {spot && (
+        <SpotReport
+          key={spot.join()}
+          point={spot}
+          data={spotData}
+          onShow={showTarget}
+          onRouteFrom={() => {
+            tools.routeFrom(spot);
+            setToolsOpen(true);
+            setSpot(null);
+          }}
+          onPin={() => {
+            tools.addPin(spot);
+            showToast('Pin dropped (Tools › Pins)');
+          }}
+          onClose={() => setSpot(null)}
+        />
+      )}
+      {!spot && cardSelection && (
         <SelectionCard
           selection={cardSelection}
           items={selectedItems}
+          onShow={showTarget}
           {...(selectedContact && {
             tracking: {
               trackable: true,

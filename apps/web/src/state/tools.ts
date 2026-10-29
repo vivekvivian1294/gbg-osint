@@ -3,8 +3,16 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Drawing } from '../engine/tools';
 import { formatArea, formatDistance, pathLengthM, polygonAreaM2 } from '../layers/measure';
 import { fetchJson } from './api';
+import {
+  loadWatchAreas,
+  MAX_WATCH_AREAS,
+  MAX_WATCH_POINTS,
+  newWatchArea,
+  saveWatchAreas,
+  type WatchArea,
+} from './watch';
 
-export type ToolMode = 'measure' | 'pin' | 'route';
+export type ToolMode = 'measure' | 'pin' | 'route' | 'watch';
 export type RouteProfile = Route['profile'];
 
 const PINS_KEY = 'gbg-osint:pins';
@@ -53,6 +61,14 @@ export interface ToolsApi {
   setProfile(profile: RouteProfile): void;
   route: { result: Route | null; error: string | null; loading: boolean };
   clear(what: ToolMode): void;
+  /** Starts a route at the point and switches to the route tool. */
+  routeFrom(point: LonLat): void;
+  addPin(point: LonLat): void;
+  watchDraft: readonly LonLat[];
+  watchAreas: readonly WatchArea[];
+  /** Saves the drawn outline as a watch area; false if it has fewer than 3 points. */
+  saveWatch(name: string): boolean;
+  removeWatch(id: string): void;
   drawing: Drawing;
 }
 
@@ -62,6 +78,8 @@ export function useTools(): ToolsApi {
   const [pins, setPins] = useState<LonLat[]>(loadPins);
   const [routeEnds, setRouteEnds] = useState<LonLat[]>([]);
   const [profile, setProfile] = useState<RouteProfile>('bike');
+  const [watchDraft, setWatchDraft] = useState<LonLat[]>([]);
+  const [watchAreas, setWatchAreas] = useState<WatchArea[]>(loadWatchAreas);
   const [route, setRoute] = useState<ToolsApi['route']>({
     result: null,
     error: null,
@@ -84,15 +102,18 @@ export function useTools(): ToolsApi {
     return () => controller.abort();
   }, [request]);
 
+  const addPin = (p: LonLat) =>
+    setPins((prev) => {
+      const next = [...prev, p].slice(-MAX_PINS);
+      savePins(next);
+      return next;
+    });
+
   const click = (p: LonLat) => {
     if (mode === 'measure') setMeasure((m) => [...m, p].slice(-MAX_MEASURE_POINTS));
-    else if (mode === 'pin') {
-      setPins((prev) => {
-        const next = [...prev, p].slice(-MAX_PINS);
-        savePins(next);
-        return next;
-      });
-    } else if (mode === 'route') {
+    else if (mode === 'pin') addPin(p);
+    else if (mode === 'watch') setWatchDraft((d) => [...d, p].slice(-MAX_WATCH_POINTS));
+    else if (mode === 'route') {
       const next = routeEnds.length >= 2 ? [p] : [...routeEnds, p];
       setRouteEnds(next);
       setRoute({ result: null, error: null, loading: next.length === 2 });
@@ -101,6 +122,7 @@ export function useTools(): ToolsApi {
 
   const clear = (what: ToolMode) => {
     if (what === 'measure') setMeasure([]);
+    else if (what === 'watch') setWatchDraft([]);
     else if (what === 'pin') {
       setPins([]);
       savePins([]);
@@ -108,6 +130,17 @@ export function useTools(): ToolsApi {
       setRouteEnds([]);
       setRoute({ result: null, error: null, loading: false });
     }
+  };
+
+  const updateWatchAreas = (next: WatchArea[]) => {
+    setWatchAreas(next);
+    saveWatchAreas(next);
+  };
+  const saveWatch = (name: string) => {
+    if (watchDraft.length < 3) return false;
+    updateWatchAreas([...watchAreas, newWatchArea(name, watchDraft)].slice(-MAX_WATCH_AREAS));
+    setWatchDraft([]);
+    return true;
   };
 
   const drawing = useMemo((): Drawing => {
@@ -123,8 +156,10 @@ export function useTools(): ToolsApi {
       pins,
       routeEnds,
       routeLine: request && route.result ? decodeLine(route.result.line) : [],
+      watchDraft,
+      watchAreas,
     };
-  }, [measure, pins, routeEnds, request, route.result]);
+  }, [measure, pins, routeEnds, request, route.result, watchDraft, watchAreas]);
 
   return {
     mode,
@@ -140,6 +175,16 @@ export function useTools(): ToolsApi {
     },
     route,
     clear,
+    routeFrom: (p) => {
+      setRouteEnds([p]);
+      setRoute({ result: null, error: null, loading: false });
+      setMode('route');
+    },
+    addPin,
+    watchDraft,
+    watchAreas,
+    saveWatch,
+    removeWatch: (id) => updateWatchAreas(watchAreas.filter((a) => a.id !== id)),
     drawing,
   };
 }
