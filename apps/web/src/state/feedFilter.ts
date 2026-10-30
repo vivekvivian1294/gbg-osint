@@ -1,13 +1,8 @@
-import { geometryVertices, type GeoEvent, type Severity } from '@gbg-osint/shared';
+import type { GeoEvent, Severity } from '@gbg-osint/shared';
+import { inView, type ViewBounds } from './bounds';
 import { eventInside, type WatchArea } from './watch';
 
-/** The part of the globe in view, in degrees; `west > east` when it spans the antimeridian. */
-export interface ViewBounds {
-  west: number;
-  south: number;
-  east: number;
-  north: number;
-}
+export type { ViewBounds } from './bounds';
 
 export type FeedWindow = 'all' | '1h' | '6h' | '24h';
 
@@ -39,34 +34,8 @@ export const WINDOW_MS: Record<Exclude<FeedWindow, 'all'>, number> = {
 export const isFiltering = (f: FeedFilter): boolean =>
   f.category !== null || f.minSeverity !== 'info' || f.window !== 'all' || f.inView || f.inWatch;
 
-type Box = [west: number, south: number, east: number, north: number];
-const boxes = new WeakMap<GeoEvent, Box | null>();
-
-function boxOf(event: GeoEvent): Box | null {
-  let box = boxes.get(event);
-  if (box === undefined) {
-    box = null;
-    for (const [lon, lat] of event.geometry ? geometryVertices(event.geometry) : []) {
-      if (!box) box = [lon, lat, lon, lat];
-      else {
-        box[0] = Math.min(box[0], lon);
-        box[1] = Math.min(box[1], lat);
-        box[2] = Math.max(box[2], lon);
-        box[3] = Math.max(box[3], lat);
-      }
-    }
-    boxes.set(event, box);
-  }
-  return box;
-}
-
 /** Whether any part of the event's area overlaps the view; events without a place never do. */
-export function eventInView(event: GeoEvent, view: ViewBounds): boolean {
-  const box = boxOf(event);
-  if (!box || box[1] > view.north || box[3] < view.south) return false;
-  if (view.west <= view.east) return box[0] <= view.east && box[2] >= view.west;
-  return box[2] >= view.west || box[0] <= view.east;
-}
+export const eventInView = (event: GeoEvent, view: ViewBounds): boolean => inView(event, view);
 
 export interface FeedContext {
   now: number;

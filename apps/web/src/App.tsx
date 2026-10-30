@@ -22,6 +22,7 @@ import { CameraReadout } from './components/CameraReadout';
 import { Clock } from './components/Clock';
 import { DistrictLegend } from './components/DistrictLegend';
 import { EventFeed } from './components/EventFeed';
+import { ExportDialog, type ExportSet } from './components/ExportDialog';
 import {
   GlobeView,
   type CameraViews,
@@ -80,6 +81,9 @@ import { useTools } from './state/tools';
 import { useSpot } from './state/spot';
 import { Watcher, watchChannels, type WatchAlert } from './state/watch';
 import { NO_FILTER, type FeedFilter, type ViewBounds } from './state/feedFilter';
+import { inView } from './state/bounds';
+import { downloadFile } from './state/download';
+import { fileStamp, isExportable, itemTitle } from './state/exportData';
 import { parseHash, writeHash, type UrlState } from './state/urlState';
 import { addKeyframe, loadRecording, recordedTour, routeTour, saveRecording } from './tours';
 
@@ -98,7 +102,7 @@ const PHOTO_CHANNEL = 'photos.street';
 /** Layers whose objects have a sensible cab or bow view. */
 const RIDE_LAYERS = new Set(['transit', 'ships', 'aircraft']);
 
-type DialogId = 'status' | 'missions' | 'scenes' | 'help';
+type DialogId = 'status' | 'missions' | 'scenes' | 'help' | 'export';
 
 function wsUrl(): string {
   const { protocol, host } = window.location;
@@ -387,6 +391,57 @@ export function App() {
       ? findContact({ layerId: cardSelection.layerId, id: selectedId })
       : undefined;
 
+  // Only gathered while the export dialog is open.
+  const exporting = dialog === 'export';
+  const creditsOf = (layers: readonly (typeof LAYERS)[number][], licence: boolean) => [
+    ...new Set(
+      layers.flatMap((l) =>
+        l.sourceIds.flatMap((id) => {
+          const s = sources.get(id);
+          if (!s) return [];
+          const who = s.attribution ?? s.name;
+          return [licence ? `${who} (${s.licence})` : who];
+        }),
+      ),
+    ),
+  ];
+  const selectedLayer = cardSelection ? LAYER_BY_ID.get(cardSelection.layerId) : undefined;
+  const exportSelection: ExportSet | null =
+    exporting && cardSelection && selectedItems.length > 0
+      ? {
+          title:
+            selectedItems.length === 1
+              ? itemTitle(selectedItems[0]!)
+              : `${selectedItems.length} items`,
+          records: selectedItems.filter(isExportable).map((item) => ({
+            layer: selectedLayer?.label ?? cardSelection.layerId,
+            channel: cardSelection.channel,
+            item,
+          })),
+          attribution: creditsOf(selectedLayer ? [selectedLayer] : [], true),
+        }
+      : null;
+  const viewRecords =
+    exporting && view
+      ? [...new Map(activeLayers.flatMap((l) => l.channels.map((c) => [c, l] as const)))].flatMap(
+          ([channel, layer]) =>
+            itemsOf(channel)
+              .filter((item) => isExportable(item) && inView(item, view))
+              .map((item) => ({ layer: layer.label, channel, item })),
+        )
+      : [];
+  const exportView: ExportSet | null =
+    exporting && view
+      ? {
+          title: '',
+          records: viewRecords,
+          attribution: creditsOf(
+            activeLayers.filter((l) => viewRecords.some((r) => r.layer === l.label)),
+            true,
+          ),
+        }
+      : null;
+
   const searchEntities = trackables.map((c) => ({
     layerId: c.layerId,
     id: c.id,
@@ -509,6 +564,23 @@ export function App() {
       () => showToast('Copy failed – use the address bar'),
     );
   };
+  const screenshot = async (): Promise<boolean> => {
+    const now = new Date();
+    const data = creditsOf(activeLayers, false);
+    const note = [
+      `GBG // OSINT · ${now.toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm' })}`,
+      data.length > 0 && `Data: ${data.join(', ')}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    const blob = await globeRef.current?.screenshot(note);
+    if (!blob) {
+      showToast('The screenshot could not be taken');
+      return false;
+    }
+    downloadFile(`gbg-osint-${fileStamp(now)}.png`, blob, 'image/png');
+    return true;
+  };
 
   const closeDialog = () => {
     if (dialog === 'missions') markVisited();
@@ -610,6 +682,10 @@ export function App() {
         case 's':
         case 'S':
           setDialog('scenes');
+          break;
+        case 'e':
+        case 'E':
+          setDialog('export');
           break;
         case 'g':
         case 'G':
@@ -758,6 +834,7 @@ export function App() {
         onOpenMissions={() => setDialog('missions')}
         onOpenScenes={() => setDialog('scenes')}
         onShare={share}
+        onExport={() => setDialog('export')}
         onResetView={resetView}
         onOpenHelp={() => setDialog('help')}
         onOpenStatus={() => setDialog('status')}
@@ -952,6 +1029,13 @@ export function App() {
         onClearRecording={clearRecording}
       />
       <ShortcutsDialog open={dialog === 'help'} onClose={closeDialog} />
+      <ExportDialog
+        open={exporting}
+        selection={exportSelection}
+        view={exportView}
+        onScreenshot={screenshot}
+        onClose={closeDialog}
+      />
     </div>
   );
 }

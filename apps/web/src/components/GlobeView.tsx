@@ -19,6 +19,7 @@ import { MarkerRenderer } from '../engine/markers';
 import { Overlay, type OverlayStats } from '../engine/overlay';
 import { RadarLayer, type RadarState } from '../engine/radar';
 import { SatelliteLayer } from '../engine/satellite';
+import { captureView } from '../engine/screenshot';
 import { Ground, TerrainController } from '../engine/terrain';
 import { StyleController } from '../engine/styles';
 import { ToolLayer, type Drawing } from '../engine/tools';
@@ -44,6 +45,8 @@ export interface GlobeHandle {
   radarSeek(index: number): void;
   /** The ground point at the centre of the view, if the globe is there. */
   centre(): LonLat | null;
+  /** A PNG of the view with `note` and the map credits in a footer. */
+  screenshot(note: string): Promise<Blob | null>;
 }
 
 /** Line features of one active layer; `version` changes whenever the features do. */
@@ -569,6 +572,22 @@ export function GlobeView(props: GlobeViewProps) {
       centre() {
         const engine = engineRef.current;
         return engine ? viewCentre(engine.globe) : null;
+      },
+      screenshot(note) {
+        const engine = engineRef.current;
+        if (!engine) return Promise.resolve(null);
+        const container = creditsRef.current;
+        const shown =
+          container?.querySelector<HTMLElement>('.cesium-credit-textContainer') ?? container;
+        const mapCredits = (shown?.innerText ?? '').replace(/\s+/g, ' ').trim();
+        const overlays = [windRef.current, overlayRef.current].filter(
+          (c): c is HTMLCanvasElement => c !== null,
+        );
+        return captureView(
+          engine.globe.scene,
+          overlays,
+          [note, mapCredits].filter(Boolean).join(' · '),
+        );
       },
     }),
     [],

@@ -35,6 +35,7 @@ interface TopBarProps {
   onOpenMissions(): void;
   onOpenScenes(): void;
   onShare(): void;
+  onExport(): void;
   onResetView(): void;
   onOpenHelp(): void;
   onOpenStatus(): void;
@@ -158,6 +159,13 @@ export function TopBar(props: TopBarProps) {
         </button>
         <button type="button" onClick={props.onShare} title="Copy a link to this view">
           Share
+        </button>
+        <button
+          type="button"
+          onClick={props.onExport}
+          title="Export the selection or view, or a screenshot (E)"
+        >
+          Export
         </button>
         <button type="button" onClick={props.onResetView} title="Reset view (R)">
           Reset

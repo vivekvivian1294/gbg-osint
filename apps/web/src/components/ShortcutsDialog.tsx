@@ -17,6 +17,7 @@ const SHORTCUTS: readonly [string, string][] = [
   ['M', 'Missions'],
   ['S', 'Scene director (camera tours)'],
   ['G', 'Map tools: measure, pins, route A→B, watch areas'],
+  ['E', 'Export the selection or view (GeoJSON, CSV) or a screenshot'],
   ['Esc', 'Leave the tool, stop tracking and tours, clear the selection'],
   ['?', 'This help'],
 ];
