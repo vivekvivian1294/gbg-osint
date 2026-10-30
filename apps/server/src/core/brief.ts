@@ -154,7 +154,7 @@ export function buildBrief(store: ChannelStore, history: History, now: number): 
           id: 'police-count',
           level: 'info',
           text: `${recentPolice.length} police event${recentPolice.length === 1 ? '' : 's'} in Göteborg in the last 3 h`,
-          detail: 'The police only give the municipality, not the exact place.',
+          detail: 'Placed at most in a district the text names; the police give no exact place.',
           target: { channel: 'events.police', ids: recentPolice.map((e) => e.id).slice(0, 50) },
         }
       : undefined,
