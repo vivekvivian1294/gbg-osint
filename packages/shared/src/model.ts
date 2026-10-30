@@ -52,10 +52,17 @@ export const Severity = z.enum(['info', 'minor', 'major', 'critical']);
 export type Severity = z.infer<typeof Severity>;
 
 /**
- * How precise an event's location is. Police events only carry a municipality, SMHI warnings a
- * county or sea area, and national news no location at all.
+ * How precise an event's location is. Police events carry at best a district named in their text,
+ * SMHI warnings a county or sea area, and national news no location at all.
  */
-export const LocationPrecision = z.enum(['exact', 'area', 'municipality', 'region', 'none']);
+export const LocationPrecision = z.enum([
+  'exact',
+  'area',
+  'district',
+  'municipality',
+  'region',
+  'none',
+]);
 export type LocationPrecision = z.infer<typeof LocationPrecision>;
 
 export const GeometrySchema = z.object({
@@ -72,6 +79,8 @@ export const EventSchema = z.object({
   body: z.string().max(5000).optional(),
   geometry: GeometrySchema.optional(),
   locationPrecision: LocationPrecision,
+  /** The named place the location stands for, e.g. the district a police text mentions. */
+  place: z.string().min(1).max(80).optional(),
   start: IsoTime,
   end: IsoTime.optional(),
   url: HttpUrl.optional(),

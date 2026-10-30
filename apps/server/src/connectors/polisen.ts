@@ -1,6 +1,7 @@
 import { GOTHENBURG, type GeoEvent, type Severity } from '@gbg-osint/shared';
 import { z } from 'zod';
 import type { PollConnector } from '../core/connector';
+import { districtIn } from './districts';
 import { truncate } from './util';
 
 const CHANNEL = 'events.police';
@@ -51,7 +52,8 @@ export function parsePoliceTime(value: string): string | undefined {
 
 /**
  * Polisen only reports county-level coordinates; the place is the last part of the event name,
- * e.g. "23 oktober 10.38, Brand, Göteborg". Events are placed at the municipality centre.
+ * e.g. "23 oktober 10.38, Brand, Göteborg". Events whose text names one district are placed at
+ * its centre, the rest at the municipality centre; both are marked approximate.
  */
 export function parsePoliceEvents(raw: unknown[], now: number): GeoEvent[] {
   const events: GeoEvent[] = [];
@@ -62,14 +64,20 @@ export function parsePoliceEvents(raw: unknown[], now: number): GeoEvent[] {
     if (e.name.split(',').at(-1)?.trim() !== 'Göteborg') continue;
     const start = parsePoliceTime(e.datetime);
     if (!start || now - Date.parse(start) > MAX_AGE_MS) continue;
+    const district = districtIn(e.summary);
     events.push({
       id: String(e.id),
       source: 'polisen',
       category: e.type,
       severity: severity(e.type),
       title: truncate(e.summary || e.name, 300),
-      geometry: { type: 'Point', coordinates: [GOTHENBURG.center.lon, GOTHENBURG.center.lat] },
-      locationPrecision: 'municipality',
+      geometry: {
+        type: 'Point',
+        coordinates: district?.at ?? [GOTHENBURG.center.lon, GOTHENBURG.center.lat],
+      },
+      ...(district
+        ? { locationPrecision: 'district' as const, place: district.name }
+        : { locationPrecision: 'municipality' as const }),
       start,
       ...(e.url.startsWith('/') && { url: `https://polisen.se${e.url}` }),
     });
@@ -80,7 +88,8 @@ export function parsePoliceEvents(raw: unknown[], now: number): GeoEvent[] {
 export const polisenEvents: PollConnector = {
   id: 'polisen.events',
   name: 'Polisen – händelser',
-  licence: 'Open data (terms at source)',
+  licence: 'Open data (terms at source); district centres CC0 (SCB) and ODbL 1.0 (OpenStreetMap)',
+  attribution: 'Polisen; district centres SCB and © OpenStreetMap contributors',
   homepage: 'https://polisen.se/om-polisen/om-webbplatsen/oppna-data/api-over-polisens-handelser/',
   mode: 'poll',
   intervalMs: 3 * 60_000,

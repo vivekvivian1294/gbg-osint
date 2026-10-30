@@ -272,7 +272,7 @@ Settings go in `.env` with the keys (see `.env.example`). All are optional.
 ## Responsible use
 
 - **No people tracking.** The tool shows vehicles, events, infrastructure and systems. It has no person search, no face recognition and no profiling. Camera and street-level images are only displayed.
-- **Estimates are labelled.** Vehicle motion between updates, camera viewsheds and approximate event locations are modelled, and the app marks them as such. Police events are only located to the municipality. Where roads and railways run in tunnels (from OpenStreetMap), lines are dashed and vehicles are shown as icons rather than 3D models.
+- **Estimates are labelled.** Vehicle motion between updates, camera viewsheds and approximate event locations are modelled, and the app marks them as such. Police events are placed in the district their text names (or else at the city centre) and marked approximate. Where roads and railways run in tunnels (from OpenStreetMap), lines are dashed and vehicles are shown as icons rather than 3D models.
 - **Respect the sources.** Every source is credited in the app. Their terms of use and rate limits apply to you when you run the tool; please don't remove the throttling or point heavy automated use at community services (OSRM, Photon, OpenFreeMap). Setting `UPSTREAM_USER_AGENT` to include your e-mail is good practice.
 - **Keep it local.** The server listens on `127.0.0.1` only. Don't expose it to the internet.
 

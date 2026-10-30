@@ -18,7 +18,7 @@ const EVENT_RADIUS_M = 500;
 const CAMERA_RADIUS_M = 5_000;
 const MAX_EVENTS = 20;
 const MAX_CAMERAS = 3;
-/** Police events only carry the municipality; "within 500 m" would be meaningless for them. */
+/** Police events are placed at best in a named district; "within 500 m" would be meaningless. */
 const PRECISE = new Set(['exact', 'area']);
 
 const decoded = new WeakMap<Area, LonLat[][][]>();

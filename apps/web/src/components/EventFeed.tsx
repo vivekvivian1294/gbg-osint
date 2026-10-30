@@ -38,6 +38,11 @@ const PRECISION_LABEL: Partial<Record<LocationPrecision, string>> = {
   area: 'area',
 };
 
+const precisionLabel = (e: GeoEvent) =>
+  e.locationPrecision === 'district' && e.place
+    ? `approx. ${e.place}`
+    : PRECISION_LABEL[e.locationPrecision];
+
 const SEVERITY_OPTIONS: [Severity, string][] = [
   ['info', 'Any severity'],
   ['minor', 'Minor or worse'],
@@ -175,9 +180,9 @@ export function EventFeed({
               <div className="feed-meta">
                 <time dateTime={e.start}>{timeFormat.format(new Date(e.start))}</time>
                 <span>{e.category}</span>
-                {PRECISION_LABEL[e.locationPrecision] && (
+                {precisionLabel(e) && (
                   <span className="approx" title={`Location precision: ${e.locationPrecision}`}>
-                    {PRECISION_LABEL[e.locationPrecision]}
+                    {precisionLabel(e)}
                   </span>
                 )}
               </div>

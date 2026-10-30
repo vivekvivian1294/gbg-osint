@@ -2,6 +2,7 @@ import { EntitySchema, EventSchema, MetricSchema } from '@gbg-osint/shared';
 import { describe, expect, it } from 'vitest';
 import { parseAircraft } from './aircraft';
 import { toSatellites, visibleSatellites } from './celestrak';
+import { DISTRICTS, districtIn } from './districts';
 import { priceMetrics } from './elpris';
 import { parseCrisisItems } from './krisinformation';
 import { parseBikeStations } from './nextbike';
@@ -64,6 +65,64 @@ describe('polisen', () => {
       url: 'https://polisen.se/aktuellt/handelser/2026/oktober/23/x/',
     });
     expect(EventSchema.safeParse(events[0]).success).toBe(true);
+  });
+
+  it('places events at the one district their text names', () => {
+    const [event] = parsePoliceEvents(
+      [
+        {
+          ...base,
+          id: 4,
+          datetime: '2026-10-23 10:50:46 +02:00',
+          name: '22 oktober 20.36, Brand, Göteborg',
+          summary:
+            'Larm inkommer till SOS om brand i en parkerad bil på Majstångsgatan, Kungsladugård.',
+          type: 'Brand',
+        },
+      ],
+      NOW,
+    );
+    expect(event).toMatchObject({
+      locationPrecision: 'district',
+      place: 'Kungsladugård',
+      geometry: { type: 'Point', coordinates: [11.9206, 57.6848] },
+    });
+    expect(EventSchema.safeParse(event).success).toBe(true);
+  });
+});
+
+describe('district names', () => {
+  const name = (text: string) => districtIn(text)?.name;
+
+  it('finds the district a text names, also in the genitive', () => {
+    expect(name('Det brinner i en mataffär på Treriksgatan i Gamlestaden.')).toBe('Gamlestaden');
+    expect(name('Misstänkt smitning från trafikolycka, Masthugget.')).toBe('Masthugget');
+    expect(name('Bråk vid Bergsjöns centrum.')).toBe('Bergsjön');
+    expect(name('Rån i Nordstan.')).toBe('Nordstaden');
+    expect(name('Olycka vid Frölunda torg.')).toBe('Frölunda');
+    expect(name('Misstänkt brand i ett flerfamiljshus i Gamlestan.')).toBe('Gamlestaden');
+    expect(name('Vi får larm om brand i en byggnad vid Rymdtorget.')).toBe('Bergsjön');
+  });
+
+  it('skips street names, directions and texts naming several districts', () => {
+    expect(name('Kollision på Lundbyleden vid Backavägen.')).toBeUndefined();
+    expect(
+      name('En förare kör i fel riktning på Lundbyleden i riktning mot Eriksberg.'),
+    ).toBeUndefined();
+    expect(name('Jakt från Angered till Hammarkullen.')).toBeUndefined();
+    expect(name('Kollision på Älvsborgsbron.')).toBeUndefined();
+    expect(name('Bränder i lunden och på heden.')).toBeUndefined();
+  });
+
+  it('keeps every district centre in the Gothenburg area, with unique names', () => {
+    const names = DISTRICTS.flatMap((d) => [d.name, ...(d.aliases ?? [])]);
+    expect(new Set(names).size).toBe(names.length);
+    for (const d of DISTRICTS) {
+      expect(d.at[0]).toBeGreaterThan(11.6);
+      expect(d.at[0]).toBeLessThan(12.25);
+      expect(d.at[1]).toBeGreaterThan(57.55);
+      expect(d.at[1]).toBeLessThan(57.85);
+    }
   });
 });
 

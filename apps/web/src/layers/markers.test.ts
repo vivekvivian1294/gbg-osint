@@ -72,6 +72,14 @@ describe('buildMarkers', () => {
       label: 'Police events ×2 (approx.)',
       pick: { ids: ['a', 'b'] },
     });
+    const inDistrict = {
+      ...event('d', 'info'),
+      geometry: { type: 'Point' as const, coordinates: [11.9206, 57.6848] },
+      locationPrecision: 'district' as const,
+      place: 'Kungsladugård',
+    };
+    const placed = buildMarkers([layer('police')], kinds, () => [inDistrict]);
+    expect(placed[0]).toMatchObject({ label: 'Police events ×1, Kungsladugård (approx.)' });
   });
 
   it('draws nothing for metric channels', () => {

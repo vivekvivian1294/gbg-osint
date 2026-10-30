@@ -456,11 +456,14 @@ function eventMarkers(layer: LayerDef, channel: string, events: GeoEvent[]): Mar
     );
     const approx = g.events.some((e) => e.locationPrecision !== 'exact');
     const single = g.events.length === 1 && !approx ? g.events[0] : undefined;
+    const place = g.events.every((e) => e.place === g.events[0]!.place)
+      ? g.events[0]!.place
+      : undefined;
     const label = single
       ? single.title.length > EVENT_TITLE_MAX
         ? `${single.title.slice(0, EVENT_TITLE_MAX - 1)}…`
         : single.title
-      : `${layer.label} ×${g.events.length}${approx ? ' (approx.)' : ''}`;
+      : `${layer.label} ×${g.events.length}${place ? `, ${place}` : ''}${approx ? ' (approx.)' : ''}`;
     return {
       key: `${layer.id}|${channel}|${key}`,
       lon: g.lon,

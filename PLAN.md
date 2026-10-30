@@ -84,11 +84,11 @@ compose.yaml         one service on 127.0.0.1:8787, with a volume for the disk c
 type Entity = { id: string; source: string; kind: 'tram'|'bus'|'ferry'|'train'|'ship'|'aircraft'|'bike_station'|'scooter';
                 lon: number; lat: number; heading?: number; speed?: number; label?: string; ts: string; props?: Record<string, unknown> };
 type Event  = { id: string; source: string; category: string; severity: 'info'|'minor'|'major'|'critical';
-                title: string; body?: string; geometry?: GeoJSON.Geometry; locationPrecision: 'exact'|'area'|'municipality';
-                start: string; end?: string; url?: string };
+                title: string; body?: string; geometry?: GeoJSON.Geometry; locationPrecision: 'exact'|'area'|'district'|'municipality'|'region'|'none';
+                place?: string; start: string; end?: string; url?: string };
 type Metric = { seriesId: string; source: string; name: string; unit: string; value: number; ts: string; lon?: number; lat?: number };
 ```
-The `locationPrecision` field matters: for example, police events only include a municipality centre point, so the map must not suggest a precise location.
+The `locationPrecision` field matters: for example, police events are placed at best at the centre of a district named in their text, so the map must not suggest a precise location.
 
 ### Connector contract
 ```ts
@@ -170,7 +170,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 ### 4.3 Police, crisis and safety
 | Source | Data | Key | Mode | Notes |
 | --- | --- | --- | --- | --- |
-| Polisen `polisen.se/api/events?locationname=Göteborg` | Police event notices | None | poll 3 min | Coordinates are **county-level only**; filter on the place at the end of the event name and show at the municipality centre. |
+| Polisen `polisen.se/api/events?locationname=Göteborg` | Police event notices | None | poll 3 min | Coordinates are **county-level only**; filter on the place at the end of the event name. Events whose summary names exactly one Göteborg district (about a quarter) are placed at its centre (`district`, with the name); the rest at the municipality centre. |
 | Krisinformation.se API | Crisis news and VMA (important public announcements) | None | poll 60 s | |
 | SMHI warnings | Weather warnings | None | poll 5 min | |
 
@@ -205,7 +205,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | --- | --- | --- | --- | --- |
 | Styr & Ställ via **nextbike GBFS** | Bike station availability | None | poll 60 s | The city's SelfServiceBicycleService API was retired on 2025-10-31. |
 | E-scooter GBFS feeds (e.g. Voi, Dott, Bolt) | Free-floating vehicles | Varies | poll 60 s | Check which operators publish public GBFS for Gothenburg. |
-| Göteborgs Stad – Parkering | Parking locations, some occupancy | Free (AppId) | poll 5 min | |
+| Göteborgs Stad – Parkering | Parking places and rules | Free (AppId) | | Not used: no open occupancy data (6.6). |
 | Göteborgs Stad – Pumpstationer | Bike pump stations | Free (AppId) | daily | Static layer. |
 
 ### 4.8 Demographics and context (static or slow-changing)
@@ -311,7 +311,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - Use only openly published data. Don't scrape sites whose terms forbid it.
 - **People are not a query type** (a rule taken from God's Eye View). The dashboard shows events, vehicles, infrastructure and systems. It has no named-person search, no face recognition and no tracking of individuals. Camera and street-level images are only displayed, never analysed for people.
 - Don't build features that track or profile individuals. Social posts are shown briefly and never stored with user identities.
-- Show location precision honestly: police events are at municipality level.
+- Show location precision honestly: police events are placed at district level at best.
 - Aircraft: respect privacy-flagged aircraft (PIA/LADD) where the source provides that information.
 - A Sources & Licences page lists the licence and attribution for every source (CC0, CC BY 4.0, ODbL, and others).
 - Add a disclaimer: the data may be delayed, incomplete, modelled or wrong, and the dashboard must not be used for navigation, emergency response or other safety-critical purposes. Link to 112 and krisinformation.se.
@@ -462,7 +462,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - ✅ **Nearest camera** *(GEV)*: selection cards for vehicles, ships, aircraft, events with a precise place and road stretches have a "Nearest road camera" button that shows the closest camera's image, distance and a link to select it.
 - ✅ **Watch areas:**
   - A fourth tool, *Watch*: click around an area, name it and save it. Areas are drawn in red and kept in this browser only.
-  - While the app is open it alerts when an incident with a precise place appears inside, or a named ship or live train enters (the first look only records what is already there; the same object is not alerted again within 30 minutes). Police events (municipality only), news and social posts are not watched, nor are anonymised leisure craft.
+  - While the app is open it alerts when an incident with a precise place appears inside, or a named ship or live train enters (the first look only records what is already there; the same object is not alerted again within 30 minutes). Police events (approximate places only), news and social posts are not watched, nor are anonymised leisure craft.
   - Alerts appear as a toast, in a "Recent alerts" list in the tool (click to show on the map) and, if allowed, as browser notifications.
   - The app subscribes to the watched channels in the background, without turning their layers on.
 - ✅ **Feed filters:** category (with counts), minimum severity, started within the last hour, 6 or 24 hours (planned future events are left out), "in view" (any part of the event's place overlaps what the camera shows; unplaced news never matches) and "in watch areas" (the same precise-place rule as the alerts). The panel shows "N of M events" and a clear button; the list stops at the newest 200 with a note.
@@ -534,7 +534,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | --- | --- | --- |
 | OpenSky (optional) | Aircraft fallback | 1 |
 | Västtrafik developer portal | Live transit | 3 |
-| Trafiklab | GTFS Regional static (`vt`): subscribe the key to *GTFS Regional Static* (currently 403) | 3 / 6 |
+| Trafiklab | GTFS Regional static (`vt`): the key must be subscribed to *GTFS Regional Static* | 3 / 6 |
 | Trafikverket Open API | Road and rail | 3 |
 | Göteborgs Stad open data (AppId) | City services | 3 |
 | aisstream.io | Ships | 3 |
@@ -551,5 +551,5 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - Port of Gothenburg and Sjöfartsverket: ViVa has open station data (✓, Phase 6); there is still no open API for port calls.
 - E-scooters: no public GBFS feed for Gothenburg was found (Voi requires authentication; Dott and Bolt publish none).
 - District boundaries: answered in Phase 5 by SCB RegSO 2025 (CC0).
-- Should we geocode the district names that appear in police event text? Doing so would improve precision but risks implying an exact location; if done, label it clearly as approximate.
+- ✅ Police events in districts (2026-10-30): a police event whose summary names exactly one Göteborg district (about 120 names and common forms like *Gamlestan* or *Nordstan*, whole words, genitive allowed, names after *mot* ignored) is placed at that district's centre (from SCB RegSO areas, else OpenStreetMap) with precision `district`. The feed, card and map label name the district and say it is approximate; such events still don't count as precise for "What's here?" or watch areas. About a quarter of recent Göteborg events are placed; the rest stay at the municipality centre.
 - Style balance: how much "spy-thriller" look versus civic readability? The current default is Normal, with sensor styles opt-in.

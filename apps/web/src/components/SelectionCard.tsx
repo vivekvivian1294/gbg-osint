@@ -355,6 +355,10 @@ function EntityDetails({ entity, channel }: { entity: Entity; channel: string })
 }
 
 function EventDetails({ event }: { event: GeoEvent }) {
+  const note =
+    event.locationPrecision === 'district' && event.place
+      ? `Approximate: placed in ${event.place}, the district named in the text.`
+      : PRECISION_NOTE[event.locationPrecision];
   return (
     <>
       <h3>
@@ -370,9 +374,7 @@ function EventDetails({ event }: { event: GeoEvent }) {
         {event.category} · {timeFormat.format(new Date(event.start))}
       </p>
       {event.body && <p>{event.body}</p>}
-      {PRECISION_NOTE[event.locationPrecision] && (
-        <p className="approx-note">{PRECISION_NOTE[event.locationPrecision]}</p>
-      )}
+      {note && <p className="approx-note">{note}</p>}
     </>
   );
 }
