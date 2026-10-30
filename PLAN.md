@@ -143,6 +143,7 @@ interface Connector {
 | Keyless (default) | Aerial imagery (Esri World Imagery), terrain, and self-hosted 3D buildings. **Esri World Imagery, Esri Dark Gray Canvas and OSM tiles are used; their usage terms apply to whoever runs the tool.** **Phase 4: buildings come from OpenFreeMap (OSM heights), proxied and cached by our server.** | Free. Licences need checking. |
 | Free key: CARTO (`CARTO_API_KEY`) | Dark Matter and Voyager raster basemaps | Free up to 5M tiles/month for non-commercial use. The key is sent to the browser (localhost). Without a key the options are disabled. |
 | Free key: Cesium ion | Cesium World Terrain, Cesium OSM Buildings | The Community plan is for personal, non-commercial use and has quotas. Check eligibility. |
+| Metered (community option): Google Photorealistic 3D Tiles | Photorealistic 3D Gothenburg | Not built. Billed per browser session to the user's own key: opt-in toggle only, with a restricted key, a daily quota cap and budget alerts. |
 
 ## 4. Data source catalogue
 
@@ -237,6 +238,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | MET Norway or Open-Meteo | Wind field for an animated wind layer | None | hourly | MET Norway requires an identifying User-Agent and caching. Open-Meteo's free tier is non-commercial. |
 | Panoramax, KartaView (`streetphotos`) | Street-level photos | None | on demand | Per z15 tile, cached for a day. The server proxies images from allow-listed hosts, and each photo's licence (CC BY-SA 4.0) is shown. Panoramax has about 1,000 photos in Gothenburg; KartaView is sparse and restricts bounding-box search, so a radius search is used. |
 | OpenFreeMap (`openfreemap.buildings`) | 3D building footprints and heights (OSM) | None | on demand | Vector tiles (OpenMapTiles schema). They replaced Overpass, which was often over capacity. |
+| Mapillary (community option) | Street-level photos | Free client token | on demand | Not built. The token is public by design. |
 | Sveriges Radio open API + Radio Browser (`radio.stations`) | P1, P2, P3, P4 Göteborg and P4 Väst, plus community stations near Gothenburg | None | on demand (cached daily) | HTTPS streams only; the CSP allows `media-src https:`. Only a few community stations near Gothenburg have working HTTPS streams. |
 | OSRM via FOSSGIS (`osrm.routes`) | Walk, bike and drive routes | None | on demand | Throttled to 1 request/s and cached. FOSSGIS bike durations are implausible, so cycling time is estimated at 16 km/h. Fine for occasional personal use; heavy users should self-host OSRM (usage policy). |
 | OpenStreetMap (Overpass, prefetched) | Infrastructure: port terminals, bridges, tunnels, substations, power lines, fuel depots | None | weekly | Label as community-mapped and incomplete. |
@@ -294,7 +296,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - Apply `@fastify/helmet` (CSP), `@fastify/rate-limit`, a WebSocket connection cap per IP, and size limits on messages.
 - Use per-connector exponential backoff and a circuit breaker so one failing source can't affect the others or flood the upstream API.
 - Cap upstream response sizes. Error messages sent to clients must not include upstream URLs or keys.
-- **Keys the browser must see** (Cesium ion, CARTO):
+- **Keys the browser must see** (Cesium ion, CARTO, and Google Map Tiles or Mapillary if added):
   - Restrict each one by HTTP referrer and by API.
   - Set provider-side daily quotas and budget alerts. App-level throttles are not billing caps.
 - There is no in-app key entry; keys are set only in `.env` (or the environment).
@@ -365,7 +367,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - adsb.lol started limiting keyless use, so aircraft now come from adsb.fi.
 - **Visual update before Phase 4:** animated rivers and streams, 3D trams, buses, ferries, ships and illustrative cars, and smooth slow-motion playback of public transport. See "Rendering engine".
 
-### Phase 4 – 3D city and cameras ✅ done (keyless parts)
+### Phase 4 – 3D city and cameras ✅ done
 - **Radar:** SMHI precipitation radar as an animated overlay of the last hour, with play/pause, a scrubber and a colour legend.
 - **3D buildings:** OpenStreetMap buildings from OpenFreeMap tiles. Heights come from OSM tags or estimates (OpenMapTiles `render_height`).
 - **Road cameras:**
@@ -378,7 +380,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Scene director (`S`, Scenes button):**
   - Four tours: *Göta älv from the sea*, *Inner city orbit*, *Port of Gothenburg* and *Final approach, Landvetter*.
   - Record your own tour from views you add.
-- **Skipped:** Google Photorealistic 3D (metered per visitor) and Mapillary (token). Cesium ion terrain and buildings were added in 6.5.
+- **Optional, open to the community:** Google Photorealistic 3D Tiles (metered per visitor) and Mapillary street-level photos (free client token). Not planned by the maintainer; each would use the user's own key (see *Basemap tiers* and *Security*). Cesium ion terrain and buildings were added in 6.5.
 - **Findings:**
   - Overpass was over capacity (502) for building queries, so OpenFreeMap is the building source.
   - Basemap changes now replace only the base imagery layer, so overlays such as radar survive.
@@ -539,6 +541,8 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | Swedavia API portal | GOT flights | 3 |
 | CARTO (optional) | Dark Matter and Voyager basemaps | 3 |
 | Cesium ion (optional) | World terrain, OSM Buildings | 4 |
+| Google Map Tiles API (community option, metered) | Photorealistic 3D | 4 |
+| Mapillary (community option) | Street-level photos | 4 |
 | ENTSO-E (optional) | Energy mix (not needed: Energy-Charts covers it) | 5 |
 | OpenAI or Gemini (optional, metered) | Voice agent | 9 |
 

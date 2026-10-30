@@ -30,7 +30,7 @@ npm run format:check && npm run lint && npm run typecheck && npm test && npm run
 
 [PLAN.md](PLAN.md) has the architecture, the source catalogue and the roadmap.
 
-Phase 9, an optional voice and AI analyst (each user brings their own AI key), is left for the community to build. Open an issue to discuss the design before you start.
+Some optional features are left for the community to build (see [PLAN.md](PLAN.md)): Phase 9, a voice and AI analyst, and two Phase 4 options, Google Photorealistic 3D Tiles and Mapillary street-level photos. Each would use the user's own key. Open an issue to discuss the design before you start.
 
 ## Adding a data source
 
