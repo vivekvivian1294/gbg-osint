@@ -525,7 +525,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - ✅ `npm start` builds and runs everything on http://localhost:8787. `docker compose up --build` does the same in one container, published on localhost only, with a volume for the disk cache.
 - ✅ README (quick start, optional keys and where to get them, responsible use), MIT licence, CI also builds the Docker image.
 - To do: make the first commit, run a secret scan, create the public GitHub repo and push.
-- Later: screenshots or a short GIF in the README, and a `CONTRIBUTING.md` explaining how to add a connector.
+- ✅ README screenshots (`docs/images/`, captured with headless Chrome on the GPU) and `CONTRIBUTING.md` explaining how to add a data source end to end.
 - Dropped: CDN and VPS hosting, a domain, uptime monitoring, WebSocket load tests and self-hosted OSRM. A phone layout is optional.
 
 ### Phase 9 – Optional: voice and AI analyst

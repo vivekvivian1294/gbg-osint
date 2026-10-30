@@ -3,6 +3,7 @@
 **/dist/
 **/coverage/
 apps/web/public/cesium/
+docs/
 .env
 .env.*
 !.env.example

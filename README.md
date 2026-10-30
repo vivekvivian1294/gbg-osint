@@ -4,6 +4,12 @@ A live 3D picture of Gothenburg built only from open data: trams, buses, ferries
 
 It is a **research tool you run on your own computer**, not a hosted website. Your copy talks to the public data sources directly, with your own (optional) API keys.
 
+![Göta älv in 3D with live trams, buses, ships and transit routes](docs/images/overview.jpg)
+
+| ![District statistics with road incidents, vehicles and the situation brief](docs/images/analyst.jpg) | !["What's here?" with nearby roadworks and the nearest road camera](docs/images/whats-here.jpg) | ![Thermal optics with the HUD and detection boxes](docs/images/optics.jpg) |
+| :---------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------: |
+|                         District statistics and the "Now in Gothenburg" brief                         |                             "What's here?" for any spot on the map                              |               Optics styles with the HUD and detection boxes               |
+
 ## Quick start
 
 You need [Node.js 24+](https://nodejs.org/).
@@ -72,7 +78,7 @@ npm run typecheck && npm run lint && npm run format:check
 - `apps/web`: React + CesiumJS app (`src/engine/` for the 3D engine, `src/layers/` for the layer registry).
 - `packages/shared`: zod schemas for the normalized model (entities, events, metrics and more).
 
-[PLAN.md](PLAN.md) has the architecture, the data source catalogue and the roadmap.
+[PLAN.md](PLAN.md) has the architecture, the data source catalogue and the roadmap. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to add a data source.
 
 ## Licence
 
