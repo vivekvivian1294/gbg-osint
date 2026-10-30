@@ -174,10 +174,6 @@ export function buildBrief(store: ChannelStore, history: History, now: number): 
       .map((e) => eventItem('events.rail', e))
       .sort(byLevel)
       .slice(0, 3),
-    ...events('events.transit')
-      .map((e) => eventItem('events.transit', e))
-      .sort(byLevel)
-      .slice(0, 3),
     worstLine
       ? {
           id: 'worst-line',

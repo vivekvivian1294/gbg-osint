@@ -154,7 +154,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | Source | Data | Key | Mode | Notes |
 | --- | --- | --- | --- | --- |
 | Västtrafik API portal (developer.vasttrafik.se) – Planera Resa v4 | Live vehicle positions (bbox), departure boards, journeys | Free (OAuth2 client credentials) | poll 5–10 s | **The main source for live trams, buses and ferries.** |
-| Västtrafik traffic disruptions API (`/ts/v1`) | Service disruptions | Free | poll 60 s | The app must also be subscribed to the "Trafikstörningar" API on the portal (currently returns 403). |
 | Trafiklab GTFS Regional `vt` (static) | Stops, routes, shapes | Free (Trafiklab) | daily | Draws routes and stops. **Trafiklab has no Västtrafik GTFS-RT** (static only), so use Västtrafik's API for live data. |
 | Trafikverket Open API – `TrainAnnouncement` | Train arrivals and departures at Göteborg C | Free | poll 30 s or SSE | Station signature `G`. |
 
@@ -166,7 +165,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | Trafikverket – `TrafficFlow` (`trafikverket.trafficflow`) | Flow and average speed per lane at measurement stations | Free | poll 2 min | Namespace `road.trafficinfo`, schema 1.5. Snapped to OSM road geometry (Overpass, cached 7 days) to drive the illustrative cars. |
 | Trafikverket – `WeatherMeasurepoint`, `FerryAnnouncement` | Road weather, road ferries | Free | poll | |
 | Göteborgs Stad – Trafikpåverkan (TrafficInformation v1.3) | City traffic disruptions and roadworks | Free (AppId) | poll 10 min | Very slow (often over 60 s, about 400 KB), so the timeout is 120 s. |
-| Göteborgs Stad – Brostatus (Hisingsbron) | Bridge open/closed status | Free (separate APIM subscription key) | poll 30 s | API v2.0 moved to the city's Azure API Management portal; the AppId no longer works. Not implemented yet. |
 
 ### 4.3 Police, crisis and safety
 | Source | Data | Key | Mode | Notes |
@@ -264,8 +262,8 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - **Context:** districts, statistics, energy prices
 
   Each row shows the last update time, a health dot, the licence, and "needs key" when relevant.
-- **Right – Live feed:** police, crisis, traffic, transit disruptions and news. It can be filtered, and clicking an item flies the camera to it.
-- **Top strip:** weather now, air quality, Göta älv level, SE3 price, Hisingsbron status, active warnings.
+- **Right – Live feed:** police, crisis, traffic, rail disruptions and news. It can be filtered, and clicking an item flies the camera to it.
+- **Top strip:** weather now, air quality, Göta älv level, SE3 price, active warnings.
 - **Drawers:** departures board, Göteborg C trains, GOT flights, camera viewer, street-level viewer, district statistics, radio tuner.
 
 ### Interaction
@@ -280,16 +278,14 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - *Harbour watch*
   - *Approach GOT*
   - *Storm watch*
-  - *Bridge lift*: Hisingsbron opening while ships pass
 - **Scene director:** record camera tours for clips and demos.
 - **Share links:** the camera, style, layers and tracked object are saved in the URL.
 - **Search without a geocoder:** a bundled list of Gothenburg districts, landmarks and stops, plus coordinates and `geo:` URIs. As a fallback, Photon or Nominatim through the server, with caching.
 - **Tools:** measure distance; draw pins, lines and areas; plan an A→B route.
 - **Keyboard:** `1`–`6` styles · `H` HUD · `D` detection · `T` track · `C` ride-along · `R` reset to city view · `/` search · `Esc` exit.
 
-### Footer and mobile
+### Footer
 - **Footer:** Sources & licences, and a status page showing every connector's health.
-- **Phone:** a bottom tab bar, with one panel sheet open at a time.
 
 ## 6. Security
 
@@ -365,8 +361,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Aviation:** Swedavia GOT arrivals and departures. A flight can be tracked when its callsign matches a live aircraft.
 - **UI:** a Boards panel (`B`) with transit hubs, Göteborg C and Landvetter, tabbed with the feed. CARTO Dark Matter and Voyager basemaps are available when `CARTO_API_KEY` is set.
 - **Not done yet:**
-  - Västtrafik disruptions (needs the API subscription).
-  - Hisingsbron status (needs an APIM key).
   - GTFS static routes and stops (Trafiklab; the quota is 50 requests/month, so cache the file).
   - Trafikverket SSE (polling is used instead), road ferries, and parking.
 - **Findings:**
@@ -480,14 +474,11 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - ✅ **Export** (`E` or the Export button): the selection or everything in view (items of the layers that are on whose place overlaps the view, with a count per layer) as GeoJSON (geometry per item type, closed polygon rings, `attribution` with each source's licence) or CSV (one representative point per item, UTF-8 with BOM for spreadsheets, cells starting with = + - @ neutralised against formula injection). "Save screenshot" copies the globe and its overlays straight after a render and adds a footer with the time, the data sources and the map credits. Departures, radar frames and news without a place are not exported.
 - ✅ **Address search:** after bundled places, live objects and coordinates, the search box offers "Search addresses for …" (also Enter when nothing matches). Lookups go only on request, never per keystroke, through the server's `photon.geocode` connector (Photon by komoot, OpenStreetMap data): limited to the Gothenburg area, one request a second, cached for a day, query sent as base64url and validated (3–60 characters, canonical encoding, no control characters). Choosing an address flies there and opens "What's here?" at the exact point.
 
-**6.5 Needs a key or subscription from you**
+**6.5 Needs a key or subscription from you** ✅ done
 - ✅ **Trafiklab GTFS Regional** (`TRAFIKLAB_GTFS_REGIONAL_KEY`): the Västtrafik feed (about 100 MB zipped, 570 MB unpacked) is downloaded at most once a week; the free tier allows few downloads a month, so the processed network is cached on disk and reused across restarts. A small built-in zip reader streams `shapes.txt` and `stop_times.txt` (about 5 million lines each, about 8 s).
   - *Public transport routes:* the most common path for each line and direction within the area (about 440 lines, simplified to 4 m), in the line's own Västtrafik colour when its vehicles are on the map, else by mode; buses fainter. Shapes are split where the source has gaps over 5 km. Clicking a line shows where it goes and the operator.
   - *Stops & stations:* about 1,300 stations with the lines serving them (e.g. Brunnsparken: "Tram 1, 2, 3 … · Bus 18, 25 …"), coloured by their main mode and searchable.
   - Not done: snapping trams to their own line's shape (they already follow OSM tracks).
-- **Västtrafik portal:** subscribe to *Trafikstörningar* (currently 403) to get transit disruptions.
-- **Göteborgs Stad APIM key:** Hisingsbron opening status, enabling the *Bridge lift* mission.
-- **NASA FIRMS** (free map key): active fires, which matter in dry Swedish summers.
 - ✅ **Cesium ion** (`CESIUM_ION_ACCESS_TOKEN`, free, non-commercial): the `3D` button (and `terrain=1` in the link) switches on Cesium World Terrain and Cesium OSM Buildings, which replace the OpenFreeMap buildings while it is on.
   - Vehicles, ships, pins and labels sit on the real ground (heights sampled from loaded tiles, cached and refreshed as finer tiles arrive); aircraft use reported altitude plus the local geoid height (about 35 m).
   - Lines and areas (routes, waterways, districts, travel times, viewsheds, tools) are draped on the terrain, and clicks pick the terrain surface.
@@ -517,15 +508,14 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 3. 24-hour memory with sparklines, the situation brief and the delay index. ✅
 4. Spot report, nearest camera and watch areas. ✅
 5. Weather extras and seasonal layers. ✅
-6. The 6.5 items as keys arrive.
+6. The 6.5 items as keys arrive. ✅
 
-### Phase 7 – History and replay (in progress)
+### Phase 7 – History and replay ✅ done
 - ✅ **Storage:** SQLite built into Node (`node:sqlite`) instead of Postgres, so `npm start` and the single Docker image need nothing extra. One file, `history.db`, in the cache directory; the 24-hour JSON history of Phase 6 is imported once.
   - 7 days in full detail: 5-minute series (as before), tracks of ships, aircraft and trains (with heading), and for every event, every reading and the replayed objects when they were present and what they said (a new version at most every 15 minutes).
   - Writes are batched per minute; presence is checkpointed every 10 minutes and on shutdown. Pruned hourly. Expected size: well under 100 MB.
   - API: `series` and `track` take `?hours=` (1–168; spans over a day are averaged to at most 1,000 points), `GET /api/history/range`, and `GET /api/history/at?t=<epoch ms>&channels=…` for a past moment (positions interpolated between track points). A snapshot takes about 20 ms.
 - ✅ **Replay** (`P`, or *Replay* in the top bar): a timeline over the stored days with −15/+15 minutes, play at 1 min, 10 min or 1 h per second, and *Live*. Events, readings, ships, aircraft, trains, sensors and the wind field show the replayed moment; trams and buses, boards, cameras, radar and other live-only layers are empty, and districts, stops, routes and waterways stay as they are. The moment is kept in the link (`t=`). Watch alerts and the brief stay live.
-- Next: trends over the week (delays per line, air quality, incidents per day) and anomaly flags against hour-of-day baselines.
 
 ### Phase 8 – Share as an open research tool (replaces the public launch)
 - ✅ One process serves the API, the WebSocket and the built web app, with the CSP and security headers. Caddy is gone.
@@ -533,7 +523,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - ✅ README (quick start, optional keys and where to get them, responsible use), MIT licence, CI also builds the Docker image.
 - To do: make the first commit, run a secret scan, create the public GitHub repo and push.
 - ✅ README screenshots (`docs/images/`, captured with headless Chrome on the GPU) and `CONTRIBUTING.md` explaining how to add a data source end to end.
-- Dropped: CDN and VPS hosting, a domain, uptime monitoring, WebSocket load tests and self-hosted OSRM. A phone layout is optional.
+- Dropped: CDN and VPS hosting, a domain, uptime monitoring, WebSocket load tests and self-hosted OSRM.
 
 ### Phase 9 – Optional: voice and AI analyst
 - A realtime voice agent with tools such as "fly to", "toggle layer", "track" and "count/filter" (for example, *"How many trams are delayed right now?"*).
@@ -549,7 +539,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | Trafiklab | GTFS Regional static (`vt`): subscribe the key to *GTFS Regional Static* (currently 403) | 3 / 6 |
 | Trafikverket Open API | Road and rail | 3 |
 | Göteborgs Stad open data (AppId) | City services | 3 |
-| Göteborgs Stad APIM portal (optional) | Hisingsbron bridge status | 3 / 6 |
 | aisstream.io | Ships | 3 |
 | Swedavia API portal | GOT flights | 3 |
 | CARTO (optional) | Dark Matter and Voyager basemaps | 3 |
@@ -557,7 +546,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | Google Map Tiles API (optional, metered) | Photorealistic 3D | 4 |
 | Mapillary (optional) | Street-level photos | 4 |
 | ENTSO-E (optional) | Energy mix (not needed: Energy-Charts covers it) | 5 |
-| NASA FIRMS (optional) | Active fires | 6 |
 | OpenAI or Gemini (optional, metered) | Voice agent | 9 |
 
 ## 10. Open questions and research spikes

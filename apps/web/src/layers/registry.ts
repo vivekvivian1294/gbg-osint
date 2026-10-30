@@ -196,14 +196,6 @@ export const LAYERS: readonly LayerDef[] = [
     phase: 1,
   },
   {
-    id: 'bridge',
-    label: 'Hisingsbron status',
-    group: 'infrastructure',
-    sourceIds: ['goteborg.bridge'],
-    channels: ['infra.bridge'],
-    phase: 3,
-  },
-  {
     id: 'police',
     label: 'Police events',
     group: 'events',
@@ -277,14 +269,6 @@ export const LAYERS: readonly LayerDef[] = [
     channels: ['events.street-works'],
     phase: 6,
     note: 'Göteborgs Stad start permits for digging, cables, paving and track work in or next to city streets, under way now within their planned dates. Contractors’ contact details are left out.',
-  },
-  {
-    id: 'transit-disruptions',
-    label: 'Transit disruptions',
-    group: 'events',
-    sourceIds: ['vasttrafik.disruptions'],
-    channels: ['events.transit'],
-    phase: 3,
   },
   {
     id: 'weather',
