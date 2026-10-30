@@ -514,11 +514,11 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - API: `series` and `track` take `?hours=` (1–168; spans over a day are averaged to at most 1,000 points), `GET /api/history/range`, and `GET /api/history/at?t=<epoch ms>&channels=…` for a past moment (positions interpolated between track points). A snapshot takes about 20 ms.
 - ✅ **Replay** (`P`, or *Replay* in the top bar): a timeline over the stored days with −15/+15 minutes, play at 1 min, 10 min or 1 h per second, and *Live*. Events, readings, ships, aircraft, trains, sensors and the wind field show the replayed moment; trams and buses, boards, cameras, radar and other live-only layers are empty, and districts, stops, routes and waterways stay as they are. The moment is kept in the link (`t=`). Watch alerts and the brief stay live.
 
-### Phase 8 – Share as an open research tool (replaces the public launch)
+### Phase 8 – Share as an open research tool (replaces the public launch) ✅ done
 - ✅ One process serves the API, the WebSocket and the built web app, with the CSP and security headers. Caddy is gone.
 - ✅ `npm start` builds and runs everything on http://localhost:8787. `docker compose up --build` does the same in one container, published on localhost only, with a volume for the disk cache.
 - ✅ README (quick start, optional keys and where to get them, responsible use), MIT licence, CI also builds the Docker image.
-- To do: make the first commit, run a secret scan, create the public GitHub repo and push.
+- ✅ Public GitHub repo ([vivekvivian1294/gbg-osint](https://github.com/vivekvivian1294/gbg-osint)). Secret scan (2026-10-30): every object in the history (28 commits) was checked for the local `.env` values and common key patterns (private keys, AWS, GitHub, Google and Slack tokens, JWTs, keys in URLs, assigned secrets). Nothing was found; the only JWT is a made-up test token. Commits use the GitHub no-reply address.
 - ✅ README screenshots (`docs/images/`, captured with headless Chrome on the GPU) and `CONTRIBUTING.md` explaining how to add a data source end to end.
 - Dropped: CDN and VPS hosting, a domain, uptime monitoring, WebSocket load tests and self-hosted OSRM.
 
