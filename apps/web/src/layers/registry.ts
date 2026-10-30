@@ -270,6 +270,15 @@ export const LAYERS: readonly LayerDef[] = [
     phase: 3,
   },
   {
+    id: 'street-works',
+    label: 'Street works (city permits)',
+    group: 'events',
+    sourceIds: ['goteborg.permits'],
+    channels: ['events.street-works'],
+    phase: 6,
+    note: 'Göteborgs Stad start permits for digging, cables, paving and track work in or next to city streets, under way now within their planned dates. Contractors’ contact details are left out.',
+  },
+  {
     id: 'transit-disruptions',
     label: 'Transit disruptions',
     group: 'events',
@@ -322,6 +331,15 @@ export const LAYERS: readonly LayerDef[] = [
     note: 'NASA VIIRS true colour from yesterday, about 375 m per pixel: clouds, snow, ice and algae blooms.',
   },
   {
+    id: 'noise',
+    label: 'Road traffic noise (modelled)',
+    group: 'environment',
+    sourceIds: ['goteborg.noise'],
+    channels: [],
+    phase: 6,
+    note: 'Göteborgs Stad’s 2023 calculation of road traffic noise as a 24-hour average (LAeq). A model, not measurements; zoom in to the city to see it.',
+  },
+  {
     id: 'harbour-stations',
     label: 'Harbour stations (ViVa)',
     group: 'environment',
@@ -329,6 +347,15 @@ export const LAYERS: readonly LayerDef[] = [
     channels: ['env.harbour'],
     phase: 6,
     defaultOn: true,
+  },
+  {
+    id: 'sea-forecast',
+    label: 'Sea forecast (waves at Vinga)',
+    group: 'environment',
+    sourceIds: ['metno.oceanforecast'],
+    channels: ['env.sea-forecast'],
+    phase: 6,
+    note: 'MET Norway ocean model off Vinga: significant wave height now and the highest in the next 24 hours (the time shows when), and the sea temperature.',
   },
   {
     id: 'sea-level',

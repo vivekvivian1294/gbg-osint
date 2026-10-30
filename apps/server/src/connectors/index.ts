@@ -9,8 +9,14 @@ import { energyChartsSweden } from './energyCharts';
 import { nasaGibs } from './gibs';
 import { photonGeocoder } from './geocoder';
 import { trafiklabGtfs } from './gtfs';
-import { goteborgAirQuality, goteborgTraffic, goteborgWaterLevels } from './goteborg';
-import { metNowcast, vivaHarbour } from './harbour';
+import {
+  goteborgAirQuality,
+  goteborgNoise,
+  goteborgStreetWorks,
+  goteborgTraffic,
+  goteborgWaterLevels,
+} from './goteborg';
+import { metNowcast, metOceanForecast, vivaHarbour } from './harbour';
 import { krisinformation } from './krisinformation';
 import { styrOchStall } from './nextbike';
 import { openMeteoWind } from './openMeteo';
@@ -92,4 +98,7 @@ export const connectors: readonly Connector[] = [
   nasaGibs,
   trafiklabGtfs,
   photonGeocoder,
+  goteborgStreetWorks,
+  goteborgNoise,
+  metOceanForecast,
 ];

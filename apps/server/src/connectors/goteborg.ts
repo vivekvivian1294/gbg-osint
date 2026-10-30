@@ -1,8 +1,9 @@
-import type { Entity, GeoEvent } from '@gbg-osint/shared';
+import type { Entity, GeoEvent, Severity } from '@gbg-osint/shared';
 import { z } from 'zod';
-import type { PollConnector } from '../core/connector';
+import type { OnDemandConnector, PollConnector } from '../core/connector';
+import { tileLat, tileLon } from './gibs';
 import { roadSeverity } from './trafikverket';
-import { inGothenburgBbox, truncate } from './util';
+import { inGothenburgBbox, stockholmTimeToIso, truncate } from './util';
 
 const PSI_HOST = 'data.goteborg.se';
 const CATALOG_HOST = 'catalog.goteborg.se';
@@ -105,6 +106,227 @@ export const goteborgTraffic: PollConnector = {
     ctx.publish.replace(CITY_TRAFFIC, parseCityTraffic(Array.isArray(raw) ? raw : [], Date.now()));
   },
 };
+
+// --- Starttillstånd: permits for work in or next to city streets ---
+
+const STREET_WORKS = 'events.street-works';
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}/;
+const IMPACT: Record<number, string> = {
+  1: 'none',
+  2: 'small',
+  3: 'moderate',
+  4: 'large',
+  5: 'very large',
+};
+const SEVERITY_RANK: Record<Severity, number> = { info: 0, minor: 1, major: 2, critical: 3 };
+
+/** Only the fields shown are read; the feed also names contractors' staff and their phone numbers. */
+const StartPermit = z.object({
+  StartPermissionNumber: z.number().int().positive(),
+  Address: z.string().optional(),
+  WorkPhases: z.array(z.unknown()),
+});
+const WorkPhase = z.object({
+  WorkPhaseNumber: z.number().int(),
+  WorkPhaseDescription: z.string().optional(),
+  WorkType: z.string().optional(),
+  WorkPhaseStartDate: z.string(),
+  WorkPhaseEndDate: z.string(),
+  WorkTimeStart: z.string().optional(),
+  WorkTimeEnd: z.string().optional(),
+  SeverityCode: z.number().optional(),
+  BikeSeverityCode: z.number().optional(),
+  Addition: z.string().optional(),
+  IsOngoing: z.boolean(),
+  Lat: z.number(),
+  Long: z.number(),
+});
+
+const localDay = (date: string, time: string) =>
+  DATE_ONLY.test(date) ? stockholmTimeToIso(`${date.slice(0, 10)} ${time}`) : undefined;
+
+/** Work phases under way now, within their planned dates, one event each. */
+export function parseStartPermits(raw: readonly unknown[], now: number): GeoEvent[] {
+  const events: GeoEvent[] = [];
+  for (const item of raw) {
+    const permit = StartPermit.safeParse(item);
+    if (!permit.success) continue;
+    const { StartPermissionNumber: number, Address: address } = permit.data;
+    for (const p of permit.data.WorkPhases) {
+      const parsed = WorkPhase.safeParse(p);
+      if (!parsed.success) continue;
+      const w = parsed.data;
+      if (!w.IsOngoing || !inGothenburgBbox(w.Long, w.Lat)) continue;
+      const start = localDay(w.WorkPhaseStartDate, '00:00');
+      const end = localDay(w.WorkPhaseEndDate, '23:59');
+      if (!start || !end || Date.parse(start) > now || Date.parse(end) < now) continue;
+      const road = roadSeverity(w.SeverityCode, undefined);
+      const bike = roadSeverity(w.BikeSeverityCode, undefined);
+      const hours =
+        w.WorkTimeStart &&
+        w.WorkTimeEnd &&
+        !(w.WorkTimeStart.startsWith('00:00') && w.WorkTimeEnd.startsWith('00:00'))
+          ? `Work hours ${w.WorkTimeStart.slice(0, 5)}–${w.WorkTimeEnd.slice(0, 5)}`
+          : undefined;
+      const impact = [
+        w.SeverityCode && IMPACT[w.SeverityCode] && `Traffic impact: ${IMPACT[w.SeverityCode]}`,
+        w.BikeSeverityCode &&
+          w.BikeSeverityCode > 1 &&
+          IMPACT[w.BikeSeverityCode] &&
+          `cycling: ${IMPACT[w.BikeSeverityCode]}`,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      const body = [
+        w.WorkPhaseDescription,
+        w.Addition,
+        impact,
+        hours,
+        `Permit ${number}, phase ${w.WorkPhaseNumber}`,
+      ]
+        .filter((s): s is string => Boolean(s?.trim()))
+        .map((s) => s.trim())
+        .join(' · ');
+      events.push({
+        id: `${number}-${w.WorkPhaseNumber}`,
+        source: 'goteborg',
+        category: 'Gatuarbete',
+        severity: SEVERITY_RANK[bike] > SEVERITY_RANK[road] ? bike : road,
+        title: truncate(
+          `${w.WorkType?.trim() || 'Gatuarbete'}: ${address?.trim() || 'Göteborg'}`,
+          300,
+        ),
+        body: truncate(body, 1000),
+        geometry: { type: 'Point', coordinates: [w.Long, w.Lat] },
+        locationPrecision: 'exact',
+        start,
+        end,
+      });
+    }
+  }
+  return events;
+}
+
+export const goteborgStreetWorks: PollConnector = {
+  id: 'goteborg.permits',
+  name: 'Göteborgs Stad – street works (start permits)',
+  licence: LICENCE,
+  attribution: 'Göteborgs Stad',
+  homepage: HOMEPAGE,
+  mode: 'poll',
+  intervalMs: 30 * 60_000,
+  allowedHosts: [PSI_HOST],
+  requiredEnv: ['GBG_STAD_APP_ID'],
+  channels: [{ name: STREET_WORKS, kind: 'events' }],
+  async poll(ctx) {
+    const appId = encodeURIComponent(ctx.env.GBG_STAD_APP_ID ?? '');
+    const raw = await ctx.http.getJson(
+      `https://${PSI_HOST}/StartPermissionService/v1.4/StartPermissions/${appId}?onlyLive=true&format=json`,
+      { timeoutMs: 120_000 },
+    );
+    ctx.publish.replace(STREET_WORKS, parseStartPermits(Array.isArray(raw) ? raw : [], Date.now()));
+  },
+};
+
+// --- Road traffic noise: the city's modelled 24-hour average (LAeq, 2023) as map tiles ---
+
+const NOISE_HOST = 'geoserverextern.miljoforvaltningen.goteborg.se';
+const NOISE_WMS = `https://${NOISE_HOST}/geoserver/miljoovervakning_buller_v1/wms`;
+const NOISE_LAYER = 'interna_berakningar_trafikbuller_2023_LAeq_v1';
+/** The calculation covers the municipality. */
+export const NOISE_REGION = { west: 11.69, south: 57.55, east: 12.25, north: 57.87 } as const;
+export const NOISE_ZOOM = { min: 10, max: 17 } as const;
+const NOISE_PATH = /^laeq\/(\d{1,2})\/(\d{1,6})\/(\d{1,6})\.png$/;
+const NOISE_CACHE_BYTES = 40 * 1024 * 1024;
+const MAX_NOISE_TILE_BYTES = 1024 * 1024;
+const MERCATOR_HALF = 20_037_508.342789244;
+
+export function parseNoisePath(path: string): { z: number; x: number; y: number } | undefined {
+  const m = NOISE_PATH.exec(path);
+  if (!m) return undefined;
+  const [z, x, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (z < NOISE_ZOOM.min || z > NOISE_ZOOM.max || x >= 2 ** z || y >= 2 ** z) return undefined;
+  const r = NOISE_REGION;
+  const overlaps =
+    tileLon(x + 1, z) > r.west &&
+    tileLon(x, z) < r.east &&
+    tileLat(y, z) > r.south &&
+    tileLat(y + 1, z) < r.north;
+  return overlaps ? { z, x, y } : undefined;
+}
+
+/** Web Mercator bounds of an XYZ tile in metres: west, south, east, north. */
+export function mercatorBounds(z: number, x: number, y: number): [number, number, number, number] {
+  const size = (2 * MERCATOR_HALF) / 2 ** z;
+  return [
+    -MERCATOR_HALF + x * size,
+    MERCATOR_HALF - (y + 1) * size,
+    -MERCATOR_HALF + (x + 1) * size,
+    MERCATOR_HALF - y * size,
+  ];
+}
+
+const isPng = (b: Buffer) => b.length > 8 && b.readUInt32BE(0) === 0x89504e47;
+
+function createNoiseTiles(): OnDemandConnector {
+  const tiles = new Map<string, Buffer>();
+  let bytes = 0;
+  const remember = (key: string, body: Buffer) => {
+    tiles.set(key, body);
+    bytes += body.length;
+    for (const [k, v] of tiles) {
+      if (bytes <= NOISE_CACHE_BYTES) break;
+      tiles.delete(k);
+      bytes -= v.length;
+    }
+  };
+
+  return {
+    id: 'goteborg.noise',
+    name: 'Göteborgs Stad – road traffic noise (2023 calculation)',
+    licence: LICENCE,
+    attribution: 'Göteborgs Stad, Miljöförvaltningen',
+    homepage: 'https://catalog.goteborg.se/store/6/resource/659',
+    mode: 'on-demand',
+    allowedHosts: [NOISE_HOST],
+    channels: [],
+    async serve(ctx, path) {
+      const tile = parseNoisePath(path);
+      if (!tile) return undefined;
+      let body = tiles.get(path);
+      if (!body) {
+        const params = new URLSearchParams({
+          service: 'WMS',
+          version: '1.3.0',
+          request: 'GetMap',
+          layers: NOISE_LAYER,
+          styles: '',
+          crs: 'EPSG:3857',
+          bbox: mercatorBounds(tile.z, tile.x, tile.y)
+            .map((v) => v.toFixed(2))
+            .join(','),
+          width: '256',
+          height: '256',
+          format: 'image/png',
+          transparent: 'true',
+        });
+        body = await ctx.http.getBytes(`${NOISE_WMS}?${params}`, {
+          maxBytes: MAX_NOISE_TILE_BYTES,
+          timeoutMs: 30_000,
+        });
+        // GeoServer reports errors as XML with status 200.
+        if (!isPng(body)) return undefined;
+        remember(path, body);
+      } else {
+        tiles.delete(path);
+        tiles.set(path, body);
+      }
+      return { type: 'image/png', body, maxAgeSec: 7 * 24 * 3600 };
+    },
+  };
+}
+
+export const goteborgNoise = createNoiseTiles();
 
 // --- Water levels in Göta älv, Mölndalsån and regulated lakes ---
 

@@ -11,8 +11,11 @@ import {
 import {
   airQualityIndex,
   dotNetDate,
+  mercatorBounds,
   parseAirQuality,
   parseCityTraffic,
+  parseNoisePath,
+  parseStartPermits,
   parseWaterLevels,
 } from './goteborg';
 import { parseFlights } from './swedavia';
@@ -374,6 +377,92 @@ describe('göteborgs stad', () => {
     expect(airQualityIndex({ no2Ugm3: 400 })).toBe(6);
     expect(airQualityIndex({})).toBeUndefined();
     valid(EntitySchema, entities);
+  });
+
+  it('keeps street-work phases under way now, without contact details', () => {
+    const phase = (n: number, extra: object = {}) => ({
+      Status: 'Startad',
+      WorkPhaseNumber: n,
+      WorkPhaseDescription: 'Avstängning Vårvädersgatan ',
+      WorkPhaseStartDate: '2026-04-27',
+      WorkPhaseEndDate: '2026-12-18',
+      WorkType: 'FV-schakt',
+      WorkTimeStart: '07:00:00',
+      WorkTimeEnd: '16:00:00',
+      SeverityCode: 4,
+      SeverityText: 'Stor påverkan',
+      BikeSeverityCode: 1,
+      AffectsBikeLane: false,
+      IsOngoing: true,
+      WKT: 'POINT (11.89 57.71)',
+      Lat: 57.71285,
+      Long: 11.89143,
+      Addition: 'Ett körfält avstängt',
+      ...extra,
+    });
+    const events = parseStartPermits(
+      [
+        {
+          StartPermissionNumber: 80828,
+          Address: 'Vårvädersgatan',
+          PromoterContact: 'A Person',
+          PromoterContactPhone: '+46700000000',
+          ContractorContact: 'B Person',
+          ContractorContactPhone: '+46700000001',
+          WorkPhases: [
+            phase(1),
+            phase(2, { IsOngoing: false, Status: 'Ej startad' }),
+            phase(3, { WorkPhaseEndDate: '2026-10-01' }),
+            phase(4, { WorkPhaseStartDate: '2026-11-01' }),
+            phase(5, { Lat: 59.3, Long: 18.0 }),
+            phase(6, {
+              SeverityCode: 2,
+              BikeSeverityCode: 5,
+              WorkTimeStart: '00:00:00',
+              WorkTimeEnd: '00:00:00',
+              Addition: undefined,
+            }),
+          ],
+        },
+        { StartPermissionNumber: 'x', WorkPhases: [phase(1)] },
+      ],
+      NOW,
+    );
+    expect(events.map((e) => e.id)).toEqual(['80828-1', '80828-6']);
+    expect(events[0]).toMatchObject({
+      title: 'FV-schakt: Vårvädersgatan',
+      category: 'Gatuarbete',
+      severity: 'major',
+      body: 'Avstängning Vårvädersgatan · Ett körfält avstängt · Traffic impact: large · Work hours 07:00–16:00 · Permit 80828, phase 1',
+      start: '2026-04-26T22:00:00.000Z',
+      end: '2026-12-18T22:59:00.000Z',
+      geometry: { type: 'Point', coordinates: [11.89143, 57.71285] },
+    });
+    expect(events[1]).toMatchObject({
+      severity: 'critical',
+      body: 'Avstängning Vårvädersgatan · Traffic impact: small, cycling: very large · Permit 80828, phase 6',
+    });
+    expect(JSON.stringify(events)).not.toMatch(/Person|\+467/);
+    valid(EventSchema, events);
+  });
+
+  it('only proxies noise tiles over the city at useful zooms', () => {
+    expect(parseNoisePath('laeq/14/8736/4962.png')).toEqual({ z: 14, x: 8736, y: 4962 });
+    for (const path of [
+      'laeq/9/273/150.png',
+      'laeq/18/139800/77200.png',
+      'laeq/14/8736/4825.png',
+      'laeq/14/9000/4962.png',
+      'laeq/14/8736/4962.jpg',
+      'laeq/2/9/1.png',
+      'other/14/8736/4962.png',
+    ]) {
+      expect(parseNoisePath(path), path).toBeUndefined();
+    }
+    const [west, south, east, north] = mercatorBounds(1, 1, 0);
+    expect([west, south]).toEqual([0, 0]);
+    expect(east).toBeCloseTo(20_037_508.34, 1);
+    expect(north).toBeCloseTo(20_037_508.34, 1);
   });
 });
 

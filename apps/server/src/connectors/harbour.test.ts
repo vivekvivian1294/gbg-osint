@@ -7,7 +7,12 @@ import {
   expectedArrivals,
   isGothenburgDestination,
 } from './aisstream';
-import { nowcastMetrics, parseVivaStation, parseVivaStations } from './harbour';
+import {
+  nowcastMetrics,
+  oceanForecastMetrics,
+  parseVivaStation,
+  parseVivaStations,
+} from './harbour';
 import { stockholmTimeToIso } from './util';
 
 describe('Swedish local times', () => {
@@ -119,6 +124,46 @@ describe('rain nowcast', () => {
     const raw = series([0, 1]);
     raw.properties.meta.radar_coverage = 'temporarily unavailable';
     expect(nowcastMetrics(raw, now)).toEqual([]);
+  });
+});
+
+describe('sea forecast at Vinga', () => {
+  const now = Date.parse('2026-10-30T12:20:00Z');
+  const hourly = (heights: (number | undefined)[], start = '2026-10-30T11:00:00Z') => ({
+    properties: {
+      timeseries: heights.map((h, i) => ({
+        time: new Date(Date.parse(start) + i * 3600_000).toISOString(),
+        data: {
+          instant: {
+            details: {
+              ...(h !== undefined && { sea_surface_wave_height: h }),
+              sea_water_temperature: 13.4,
+            },
+          },
+        },
+      })),
+    },
+  });
+  const byId = (raw: unknown) =>
+    Object.fromEntries(oceanForecastMetrics(raw, now).map((m) => [m.id, m] as const));
+
+  it('reports the current hour and the highest waves within 24 hours', () => {
+    const heights = Array.from({ length: 30 }, (_, i): number =>
+      i === 20 ? 2.1 : i === 28 ? 3.5 : 0.4,
+    );
+    heights[1] = 0.6;
+    const m = byId(hourly(heights));
+    expect(m['waves-now']).toMatchObject({ value: 0.6, unit: 'm', ts: '2026-10-30T12:00:00.000Z' });
+    expect(m['waves-max']).toMatchObject({ value: 2.1, ts: '2026-10-31T07:00:00.000Z' });
+    expect(m['sea-temp']).toMatchObject({ value: 13.4, unit: '°C' });
+    for (const metric of Object.values(m)) {
+      expect(MetricSchema.safeParse(metric).success).toBe(true);
+    }
+  });
+
+  it('copes with missing waves and old forecasts', () => {
+    expect(Object.keys(byId(hourly([undefined, undefined])))).toEqual(['sea-temp']);
+    expect(oceanForecastMetrics(hourly([1, 1], '2026-10-29T00:00:00Z'), now)).toEqual([]);
   });
 });
 

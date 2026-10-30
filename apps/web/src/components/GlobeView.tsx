@@ -18,6 +18,7 @@ import type { MarkerSpec, PickRef } from '../engine/markerSpec';
 import { MarkerRenderer } from '../engine/markers';
 import { Overlay, type OverlayStats } from '../engine/overlay';
 import { RadarLayer, type RadarState } from '../engine/radar';
+import { NoiseLayer } from '../engine/noise';
 import { SatelliteLayer } from '../engine/satellite';
 import { captureView } from '../engine/screenshot';
 import { Ground, TerrainController } from '../engine/terrain';
@@ -134,6 +135,8 @@ interface GlobeViewProps {
   wind: WindField | null;
   /** Yesterday's satellite image over the basemap. */
   satellite: boolean;
+  /** The city's modelled road traffic noise over the basemap. */
+  noise: boolean;
   /** Real terrain and 3D buildings from Cesium ion (needs `basemapKeys.cesiumIonToken`). */
   terrain: boolean;
   radar: RadarFrames | null;
@@ -173,6 +176,7 @@ interface Engine {
   trail: HistoryTrailLayer;
   wind: WindLayer;
   satellite: SatelliteLayer;
+  noise: NoiseLayer;
   ground: Ground;
   terrain: TerrainController;
   radar: RadarLayer;
@@ -241,6 +245,7 @@ export function GlobeView(props: GlobeViewProps) {
       trail: new HistoryTrailLayer(globe.scene, ground),
       wind: new WindLayer(windCanvas, globe.scene, ground),
       satellite: new SatelliteLayer(globe),
+      noise: new NoiseLayer(globe),
       radar: new RadarLayer(globe, (state) => latest.current.radarStore.set(state)),
       buildings: new BuildingLayer(globe.scene, globe.creditDisplay),
       viewsheds: new ViewshedLayer(globe.scene),
@@ -393,6 +398,7 @@ export function GlobeView(props: GlobeViewProps) {
       engine.trail.destroy();
       engine.wind.set(null);
       engine.satellite.hide();
+      engine.noise.hide();
       engine.terrain.destroy();
       engine.radar.clear();
       engine.buildings.destroy();
@@ -459,6 +465,12 @@ export function GlobeView(props: GlobeViewProps) {
     if (props.satellite) engine?.satellite.show();
     else engine?.satellite.hide();
   }, [props.satellite]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (props.noise) engine?.noise.show();
+    else engine?.noise.hide();
+  }, [props.noise]);
 
   useEffect(() => {
     const engine = engineRef.current;

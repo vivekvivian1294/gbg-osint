@@ -11,8 +11,8 @@ const CACHE_BYTES = 40 * 1024 * 1024;
 const MAX_TILE_BYTES = 2 * 1024 * 1024;
 const DAY_MS = 24 * 3600_000;
 
-const tileLon = (x: number, z: number) => (x / 2 ** z) * 360 - 180;
-const tileLat = (y: number, z: number) =>
+export const tileLon = (x: number, z: number) => (x / 2 ** z) * 360 - 180;
+export const tileLat = (y: number, z: number) =>
   (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / 2 ** z))) * 180) / Math.PI;
 
 export function parseGibsPath(

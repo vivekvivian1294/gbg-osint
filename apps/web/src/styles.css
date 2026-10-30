@@ -1243,12 +1243,11 @@ kbd {
   background: linear-gradient(90deg, #50a0ff, #28c896, #82dc28, #fadc1e, #ff8c14, #e61e1e, #d228d2);
 }
 
-/* Map tools, district legend and radio */
+/* Map tools, map legends and radio */
 
 .tools-panel,
-.district-legend {
-  position: fixed;
-  z-index: 3;
+.district-legend,
+.map-legend {
   padding: 8px 10px;
   font-size: 12px;
   background: var(--panel);
@@ -1258,6 +1257,8 @@ kbd {
 }
 
 .tools-panel {
+  position: fixed;
+  z-index: 3;
   top: calc(var(--topbar-h) + var(--gap));
   left: calc(var(--left-inset, var(--gap)) + var(--gap));
   width: 330px;
@@ -1288,9 +1289,14 @@ kbd {
   font-size: 10px;
 }
 
-.district-legend {
+.map-legends {
+  position: fixed;
+  z-index: 3;
   bottom: calc(var(--bottombar-h) + var(--gap));
   left: calc(var(--left-inset, var(--gap)) + var(--gap));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   width: 240px;
 }
 
@@ -1298,28 +1304,32 @@ kbd {
   width: 100%;
 }
 
-.district-legend ol {
+.district-legend ol,
+.map-legend ol {
   margin: 8px 0 4px;
   padding: 0;
   list-style: none;
   font: 11px var(--mono);
 }
 
-.district-legend li {
+.district-legend li,
+.map-legend li {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 1px 0;
 }
 
-.district-legend .swatch {
+.district-legend .swatch,
+.map-legend .swatch {
   flex-shrink: 0;
   width: 14px;
   height: 10px;
   border-radius: 2px;
 }
 
-.district-legend p {
+.district-legend p,
+.map-legend p {
   margin: 4px 0 0;
   font-size: 11px;
 }

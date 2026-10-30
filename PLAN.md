@@ -493,15 +493,19 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - The token is sent to the browser, so it should have the `assets:read` scope only. Without a token the button is hidden and nothing changes.
   - Approximate: wind particles float 30 m above sea level, not above the hills.
 
-**6.6 Research spikes**
-- **Göteborgs Stad open data catalogue** (EntryStore API ✓ answers): look for bike counters, parking occupancy, permits and noise data.
-- **Parking:** the rules for 1,859 public time-parking zones work ✓; no occupancy endpoint found yet.
-- **SMHI lightning:** only daily archives (yesterday ✓); look for a near-real-time source.
-- **SMHI sea-level forecast and storm surge** for the harbour: the service was unreachable during testing.
-- **Power outages** (Göteborg Energi, Vattenfall): no public API found.
-- **LFV drone (UAS) zones:** the endpoint tried no longer exists; find the current one.
-- **OSM-mapped surveillance cameras** *(GEV: mapped ALPR)*: locations and tags only. Decide on the ethics before building.
-- **Ruled out for now:**
+**6.6 Research spikes** ✅ done (2026-10-30)
+- **Göteborgs Stad open data catalogue** (EntryStore, 44 datasets): no bike counters, parking occupancy or noise measurements. Two sources were built from it:
+  - ✅ **Street works** (`StartPermissionService` v1.4, AppId, CC0): the work phases under way now within their planned dates (about 460) as events with work type, address, description, lane closures, traffic and cycling impact (the worse one sets the colour) and work hours. The feed also names contractors' staff and their phone numbers; only the fields shown are read, so those never reach the server's store. Street works show up in "What's here?", the feed filters and watch areas like other events. Off by default.
+  - ✅ **Road traffic noise** (Miljöförvaltningen WMS, CC0): the city's 2023 calculation of the 24-hour average (LAeq) as an overlay with a legend. The server turns it into 256 px Web Mercator tiles (zoom 10–17, municipality only) and caches them in memory.
+  - Not used: Kalendarium (403), the resurfacing plan (CC BY-NC-ND) and BridgeService v1.0 (gone; Hisingsbron is only on the APIM portal).
+- **Parking:** no open occupancy data. ParkingService v2.3 has places and rules only, and Trafikverket `Parking` lists rest areas.
+- **SMHI lightning:** the real-time service is paid, and MET Norway's lightning API is gone. MET Norway's Frost API has Nordic lightning with a free client ID; not built for now.
+- **Sea-level forecast and storm surge:** SMHI's old forecast host no longer exists and its NEMO-Nordic sea-level forecast is now a paid service. SMHI warnings already cover high sea levels. Instead:
+  - ✅ **Sea forecast** (MET Norway oceanforecast 2.0, keyless, CC BY 4.0): significant wave height off Vinga now and the highest in the next 24 hours (with when), and the sea temperature, every 30 minutes. Part of the *Harbour watch* and *Storm watch* missions.
+- **Power outages:** Göteborg Energi's outage map uses an internal website endpoint without an open licence. Ruled out.
+- **LFV drone (UAS) zones:** found at `daim.lfv.se/geoserver/wfs` (GeoJSON, CC BY 4.0, not for operational use): the Landvetter control zone, restricted and danger areas, temporary areas from AIP SUP, NOTAM restrictions, and 1 km helipad and 5 km runway zones. Not built for now.
+- **OSM-mapped surveillance cameras:** not built, to keep the no-people-tracking line simple.
+- **Ruled out earlier:**
   - E-scooter feeds: Voi needs authentication, and Dott and Bolt publish no Gothenburg feed.
   - Port of Gothenburg port calls: no open API.
   - USGS earthquakes: rarely relevant here.

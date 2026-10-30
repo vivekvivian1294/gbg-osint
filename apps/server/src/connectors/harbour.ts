@@ -262,3 +262,97 @@ export const metNowcast: PollConnector = {
     ctx.publish.replace(NOWCAST, nowcastMetrics(raw, Date.now()));
   },
 };
+
+// --- MET Norway ocean forecast: waves and sea temperature at the approach to the harbour ---
+
+const SEA_FORECAST = 'env.sea-forecast';
+/** Open sea off Vinga, where the inlet to Gothenburg starts. */
+const VINGA = { lon: 11.604, lat: 57.632 } as const;
+const WAVE_HORIZON_MS = 24 * 3600_000;
+
+const OceanForecast = z.object({
+  properties: z.object({
+    timeseries: z.array(
+      z.object({
+        time: z.string(),
+        data: z.object({
+          instant: z.object({
+            details: z.object({
+              sea_surface_wave_height: z.number().optional(),
+              sea_water_temperature: z.number().optional(),
+            }),
+          }),
+        }),
+      }),
+    ),
+  }),
+});
+
+/** Waves now, the highest waves in the next 24 hours (stamped with when) and the sea temperature. */
+export function oceanForecastMetrics(raw: unknown, now: number): Metric[] {
+  const steps = OceanForecast.parse(raw)
+    .properties.timeseries.map((t) => ({ at: Date.parse(t.time), ...t.data.instant.details }))
+    .filter((s) => Number.isFinite(s.at) && s.at > now - 3600_000 && s.at <= now + WAVE_HORIZON_MS)
+    .sort((a, b) => a.at - b.at);
+  const current = steps.findLast((s) => s.at <= now) ?? steps[0];
+  if (!current) return [];
+  const base = { source: 'metno', lon: VINGA.lon, lat: VINGA.lat } as const;
+  const ts = new Date(current.at).toISOString();
+  const metrics: Metric[] = [];
+  if (current.sea_surface_wave_height !== undefined) {
+    metrics.push({
+      ...base,
+      id: 'waves-now',
+      name: 'Waves at Vinga',
+      unit: 'm',
+      value: current.sea_surface_wave_height,
+      ts,
+    });
+  }
+  let highest: { at: number; height: number } | undefined;
+  for (const s of steps) {
+    const height = s.sea_surface_wave_height;
+    if (height !== undefined && (!highest || height > highest.height))
+      highest = { at: s.at, height };
+  }
+  if (highest) {
+    metrics.push({
+      ...base,
+      id: 'waves-max',
+      name: 'Highest waves, next 24 h',
+      unit: 'm',
+      value: highest.height,
+      ts: new Date(highest.at).toISOString(),
+    });
+  }
+  if (current.sea_water_temperature !== undefined) {
+    metrics.push({
+      ...base,
+      id: 'sea-temp',
+      name: 'Sea temperature',
+      unit: '°C',
+      value: current.sea_water_temperature,
+      ts,
+    });
+  }
+  return metrics;
+}
+
+export const metOceanForecast: PollConnector = {
+  id: 'metno.oceanforecast',
+  name: 'MET Norway – ocean forecast (waves, sea temperature)',
+  licence: 'CC BY 4.0 (MET Norway)',
+  attribution: 'MET Norway',
+  homepage: 'https://api.met.no/weatherapi/oceanforecast/2.0/documentation',
+  mode: 'poll',
+  // The model runs a few times a day; responses are cached for about an hour.
+  intervalMs: 30 * 60_000,
+  allowedHosts: [MET_HOST],
+  channels: [{ name: SEA_FORECAST, kind: 'metrics' }],
+  async poll(ctx) {
+    const raw = await ctx.http.getJson(
+      `https://${MET_HOST}/weatherapi/oceanforecast/2.0/complete?lat=${VINGA.lat}&lon=${VINGA.lon}`,
+    );
+    ctx.publish.replace(SEA_FORECAST, oceanForecastMetrics(raw, Date.now()));
+  },
+};

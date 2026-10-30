@@ -398,6 +398,7 @@ const SEVERITY_RANK: Record<Severity, number> = { info: 0, minor: 1, major: 2, c
 const EVENT_LABEL_DISTANCE: Record<string, number> = {
   'road-incidents': 8_000,
   'city-traffic': 4_000,
+  'street-works': 3_000,
 };
 const EVENT_TITLE_MAX = 40;
 

@@ -21,6 +21,7 @@ import { BriefPanel } from './components/BriefPanel';
 import { CameraReadout } from './components/CameraReadout';
 import { Clock } from './components/Clock';
 import { DistrictLegend } from './components/DistrictLegend';
+import { NoiseLegend } from './components/NoiseLegend';
 import { EventFeed } from './components/EventFeed';
 import { ExportDialog, type ExportSet } from './components/ExportDialog';
 import {
@@ -782,6 +783,7 @@ export function App() {
         trail={trail ?? null}
         wind={wind}
         satellite={isActive('satellite')}
+        noise={isActive('noise')}
         terrain={terrain}
         radar={radarFrames}
         buildings={isActive('buildings')}
@@ -949,7 +951,12 @@ export function App() {
           }}
         />
       )}
-      {districts && <DistrictLegend classes={districts} onMetricChange={setDistrictMetric} />}
+      {(districts || isActive('noise')) && (
+        <div className="map-legends">
+          {districts && <DistrictLegend classes={districts} onMetricChange={setDistrictMetric} />}
+          {isActive('noise') && <NoiseLegend />}
+        </div>
+      )}
       {spot && (
         <SpotReport
           key={spot.join()}
