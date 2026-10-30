@@ -19,8 +19,10 @@ import {
 import { useState, type ReactNode } from 'react';
 import type { PickRef } from '../engine/markerSpec';
 import { flowRatio } from '../engine/travelTimes';
+import { pickAirport, visibilityText, windText, type AirportRole } from '../layers/airportWeather';
 import type { Contact } from '../layers/contacts';
 import { DISTRICT_METRICS } from '../layers/districts';
+import { FLIGHT_CATEGORY_COLORS } from '../layers/markers';
 import { formatDistance } from '../layers/measure';
 import { LAYER_BY_ID } from '../layers/registry';
 import { fetchJson } from '../state/api';
@@ -33,6 +35,8 @@ interface SelectionCardProps {
   selection: PickRef;
   items: readonly ChannelItem[];
   tracking?: TrackingControls;
+  /** Airport weather reports, given while riding along with an aircraft. */
+  metars?: readonly Entity[];
   /** Selects another item on the map (used by the nearest-camera lookup). */
   onShow?(target: BriefTarget): void;
   onClose(): void;
@@ -233,6 +237,56 @@ function RawReport({ label, text }: { label: string; text: unknown }) {
       <p className="muted">{label}</p>
       <pre className="raw-report">{text}</pre>
     </>
+  );
+}
+
+const AIRPORT_ROLES: Record<AirportRole, string> = {
+  arrival: 'Arrival',
+  departure: 'Departure',
+  nearest: 'Nearest airport',
+};
+
+function RideWeather({ aircraft, metars }: { aircraft: Entity; metars: readonly Entity[] }) {
+  const callsign = aircraft.props?.callsign;
+  const route = useFlightRoute(typeof callsign === 'string' ? callsign : undefined);
+  const pick = pickAirport(aircraft, metars, route);
+  if (!pick) return null;
+  const p = pick.metar.props ?? {};
+  const num = (v: unknown) => (typeof v === 'number' ? v : undefined);
+  const category = typeof p.flightCategory === 'string' ? p.flightCategory : undefined;
+  const categoryColor = category && FLIGHT_CATEGORY_COLORS[category];
+  const wind = windText(p);
+  const visibility = visibilityText(p.visibilitySm);
+  const ceiling = num(p.ceilingFt);
+  const qnh = num(p.qnhHpa);
+  const temp = num(p.tempC);
+  return (
+    <section className="ride-weather" aria-label="Airport weather">
+      <h3>
+        {AIRPORT_ROLES[pick.role]} {pick.metar.id}{' '}
+        <span className="muted">
+          {typeof p.airport === 'string' && `${p.airport}, `}
+          {formatDistance(pick.distanceKm * 1000)}
+        </span>
+        {category && (
+          <span
+            className="flight-category"
+            {...(categoryColor && { style: { color: categoryColor, borderColor: categoryColor } })}
+          >
+            {category}
+          </span>
+        )}
+      </h3>
+      <dl>
+        {wind && <Row term="Wind">{wind}</Row>}
+        {visibility && <Row term="Visibility">{visibility}</Row>}
+        {ceiling !== undefined && <Row term="Ceiling">{ceiling.toLocaleString('sv-SE')} ft</Row>}
+        {qnh !== undefined && <Row term="QNH">{qnh} hPa</Row>}
+        {temp !== undefined && <Row term="Temperature">{temp} °C</Row>}
+        <Row term="Observed">{timeFormat.format(new Date(pick.metar.ts))}</Row>
+      </dl>
+      <RawReport label="METAR" text={p.metar} />
+    </section>
   );
 }
 
@@ -525,10 +579,18 @@ function NearestCamera({ at, onShow }: { at: LonLat; onShow(target: BriefTarget)
   );
 }
 
-export function SelectionCard({ selection, items, tracking, onShow, onClose }: SelectionCardProps) {
+export function SelectionCard({
+  selection,
+  items,
+  tracking,
+  metars,
+  onShow,
+  onClose,
+}: SelectionCardProps) {
   const layer = LAYER_BY_ID.get(selection.layerId);
   const single = items.length === 1 && isEntity(items[0]!);
   const at = items.length === 1 ? positionOf(items[0]!) : undefined;
+  const riding = Boolean(metars && tracking?.tracking && tracking.ride?.active);
   return (
     <aside className="selection" aria-labelledby="selection-title">
       <header>
@@ -543,6 +605,7 @@ export function SelectionCard({ selection, items, tracking, onShow, onClose }: S
       {items.length === 0 && <p className="empty">No longer in the live data.</p>}
       {items.map((item) => (
         <article key={item.id} className="selection-item">
+          {riding && metars && isEntity(item) && <RideWeather aircraft={item} metars={metars} />}
           {isEntity(item) &&
             (item.kind === 'photo' ? (
               <PhotoDetails entity={item} />

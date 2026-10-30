@@ -54,6 +54,7 @@ import type { OverlayStats } from './engine/overlay';
 import type { RadarState } from './engine/radar';
 import type { Tour, TourKeyframe, TourState } from './engine/tours';
 import { TUNNEL_CHANNEL, TunnelMask } from './engine/tunnels';
+import { METAR_CHANNEL } from './layers/airportWeather';
 import {
   buildRoster,
   distanceKm,
@@ -273,15 +274,18 @@ export function App() {
     () => (watching ? watchChannels(channelKinds) : []),
     [watching, channelKinds],
   );
+  // Airport weather is shown live only, so not during replay.
+  const ridingAircraft = ride && tracked?.layerId === 'aircraft' && !replaying;
   const subscribed = useMemo(
     () => [
       ...new Set([
         ...liveChannels,
         ...watchList,
         ...(channelKinds.has(TUNNEL_CHANNEL) ? [TUNNEL_CHANNEL] : []),
+        ...(ridingAircraft && channelKinds.has(METAR_CHANNEL) ? [METAR_CHANNEL] : []),
       ]),
     ],
-    [liveChannels, watchList, channelKinds],
+    [liveChannels, watchList, channelKinds, ridingAircraft],
   );
 
   useEffect(() => {
@@ -416,7 +420,7 @@ export function App() {
   const boardRows = boardChannels.flatMap(itemsOf).filter(isDeparture);
   const boardNotes = new Map<string, string>();
   const landvetter = isActive('airport-weather')
-    ? itemsOf('aviation.metar').find((i) => i.id === 'ESGG')
+    ? itemsOf(METAR_CHANNEL).find((i) => i.id === 'ESGG')
     : undefined;
   if (landvetter && isEntity(landvetter) && typeof landvetter.props?.metar === 'string') {
     boardNotes.set('Göteborg Landvetter (GOT)', landvetter.props.metar);
@@ -1047,6 +1051,7 @@ export function App() {
           selection={cardSelection}
           items={selectedItems}
           onShow={showTarget}
+          {...(ridingAircraft && { metars: live.items(METAR_CHANNEL).filter(isEntity) })}
           {...(selectedContact && {
             tracking: {
               trackable: true,

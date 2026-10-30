@@ -181,7 +181,7 @@ The _Layers_ panel groups sources into _Movement_, _Departure boards_, _Cameras_
 
 ### Selecting, tracking and riding along
 
-Click any vehicle, ship, aircraft, camera, event or sensor for a card with its details. `T` keeps the camera on it, `←` and `→` step to the next contact, and `C` rides along from the cab, bridge or cockpit. Ships, aircraft and trains show where they have been in the last 24 hours, sensor cards show 24-hour sparklines, and cards can show the nearest road camera.
+Click any vehicle, ship, aircraft, camera, event or sensor for a card with its details. `T` keeps the camera on it, `←` and `→` step to the next contact, and `C` rides along from the cab, bridge or cockpit. In the cockpit, the card adds the latest weather at the flight's arrival or departure airport (Landvetter or Säve), or the nearest one. Ships, aircraft and trains show where they have been in the last 24 hours, sensor cards show 24-hour sparklines, and cards can show the nearest road camera.
 
 ### What's here?
 

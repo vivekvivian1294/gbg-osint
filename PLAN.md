@@ -424,7 +424,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Airport weather** (aviationweather.gov METAR/TAF, keyless): ESGG and ESGP as map markers coloured by flight category, with the raw METAR and TAF on the card. The latest Landvetter METAR is shown above the flight board.
 - **Flight routes** (adsbdb, keyless, on demand): aircraft cards show e.g. *SK1405 ARN→CPH (Stockholm → Copenhagen)* and the airline. Lookups are throttled and cached, including unknown callsigns.
 - **Routing upgrade:** map-matching routes are now direction-aware: no sharp turns or reversals on rails (a train can't back through a switch), a U-turn penalty on roads and a penalty for setting off against the heading. This removed the zig-zag paths through station crossovers.
-- Still open: airport weather in the ride-along view.
+- ✅ **Airport weather in the ride-along view:** riding along with an aircraft adds the METAR of its arrival airport (or departure airport, or else the nearest of Landvetter and Säve) to the top of the card: flight category, wind, visibility in km, ceiling, QNH, temperature, distance and the raw report. The weather is fetched only while riding, and not during replay.
 
 **6.2 Harbour, sea and weather** ✅ done
 - ✅ **Sjöfartsverket ViVa:** 15 stations from Vinga and Marstrand to the river at Älvängen, polled every 3 minutes (HTTPS; the documented port 8080 times out). Markers show wind with gusts (coloured from fresh breeze to storm) or water level; the card adds wind direction, surface current, visibility, water and air temperature and pressure. ViVa gives Swedish local time without a zone, converted to UTC (summer and winter time).

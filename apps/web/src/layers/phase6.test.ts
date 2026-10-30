@@ -1,7 +1,8 @@
-import type { ChannelItem, ChannelKind, Entity, Feature } from '@gbg-osint/shared';
+import type { ChannelItem, ChannelKind, Entity, Feature, FlightRoute } from '@gbg-osint/shared';
 import { describe, expect, it } from 'vitest';
 import { LocalFrame } from '../engine/path';
 import { flowRatio, offsetLine, travelTimeColor } from '../engine/travelTimes';
+import { pickAirport, visibilityText, windText } from './airportWeather';
 import { buildMarkers, FLIGHT_CATEGORY_COLORS, lineKey, MODE_COLORS, routeColor } from './markers';
 import { LAYER_BY_ID, type LayerDef } from './registry';
 
@@ -120,6 +121,53 @@ describe('Phase 6.1 markers', () => {
     expect(buildMarkers(withoutRail, kinds, itemsOf)).toHaveLength(2);
     const empty = (channel: string) => (channel === 'transit.rail' ? [] : itemsOf(channel));
     expect(buildMarkers(layers, kinds, empty).map((m) => m.pick.ids[0])).toContain('vt-train');
+  });
+});
+
+describe('airport weather while riding along', () => {
+  const metar = (id: string, lon: number, lat: number): Entity => ({
+    id,
+    source: 'aviationweather',
+    kind: 'sensor',
+    lon,
+    lat,
+    ts: '2026-10-30T12:20:00.000Z',
+  });
+  const metars = [metar('ESGG', 12.285, 57.667), metar('ESGP', 11.87, 57.775)];
+  const aircraft: Entity = { ...metar('4ac9e1', 11.9, 57.76), kind: 'aircraft' };
+  const airport = (icao: string) => ({ icao, name: icao });
+  const route = (from: string, to: string): FlightRoute => ({
+    callsign: 'SAS123',
+    origin: airport(from),
+    destination: airport(to),
+  });
+
+  it('uses the destination, else the origin, else the nearest airport', () => {
+    expect(pickAirport(aircraft, metars, route('ESSA', 'ESGG'))).toMatchObject({
+      metar: { id: 'ESGG' },
+      role: 'arrival',
+    });
+    expect(pickAirport(aircraft, metars, route('ESGG', 'EKCH'))).toMatchObject({
+      metar: { id: 'ESGG' },
+      role: 'departure',
+    });
+    const nearest = pickAirport(aircraft, metars, route('EKCH', 'ENGM'));
+    expect(nearest).toMatchObject({ metar: { id: 'ESGP' }, role: 'nearest' });
+    expect(nearest!.distanceKm).toBeCloseTo(2.4, 0);
+    expect(pickAirport(aircraft, metars, null)?.role).toBe('nearest');
+    expect(pickAirport(aircraft, [], null)).toBeUndefined();
+  });
+
+  it('words wind and visibility the European way', () => {
+    expect(windText({ windDir: '80', windKt: 12, gustKt: 24 })).toBe('080° 12 kt, gusts 24 kt');
+    expect(windText({ windDir: 'VRB', windKt: 3 })).toBe('Variable 3 kt');
+    expect(windText({ windDir: '0', windKt: 0 })).toBe('Calm');
+    expect(windText({})).toBeUndefined();
+    expect(visibilityText('6+')).toBe('10 km or more');
+    expect(visibilityText('4')).toBe('6 km');
+    expect(visibilityText('0.5')).toBe('800 m');
+    expect(visibilityText('')).toBeUndefined();
+    expect(visibilityText(undefined)).toBeUndefined();
   });
 });
 

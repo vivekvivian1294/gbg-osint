@@ -953,7 +953,8 @@ select option {
 
 .spot-section h3,
 .watch-title,
-.nearest-camera h3 {
+.nearest-camera h3,
+.ride-weather h3 {
   margin: 0 0 4px;
   font: 600 11px var(--mono);
   letter-spacing: 0.1em;
@@ -962,7 +963,8 @@ select option {
 }
 
 .spot-section h3 .muted,
-.nearest-camera h3 .muted {
+.nearest-camera h3 .muted,
+.ride-weather h3 .muted {
   font-weight: 400;
   letter-spacing: 0;
   text-transform: none;
@@ -1015,6 +1017,20 @@ select option {
 
 .nearest-camera {
   margin-top: 8px;
+}
+
+.ride-weather {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.flight-category {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  letter-spacing: 0.06em;
 }
 
 .watch-form {
