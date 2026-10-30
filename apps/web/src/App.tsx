@@ -944,6 +944,7 @@ export function App() {
       <ScenesDialog
         open={dialog === 'scenes'}
         recording={recording}
+        layers={[...enabled]}
         onClose={closeDialog}
         onPlay={playTour}
         onPlayRecording={() => playTour(recordedTour(recording))}

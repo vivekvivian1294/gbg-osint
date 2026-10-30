@@ -1151,6 +1151,23 @@ select option {
   color: var(--muted);
 }
 
+.scene-file {
+  position: relative;
+}
+
+.mission-list .scene-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: auto;
+  height: auto;
+  padding: 0 6px;
+}
+
+.scene-error {
+  color: var(--warn);
+}
+
 .shortcuts {
   display: grid;
   grid-template-columns: max-content 1fr;
