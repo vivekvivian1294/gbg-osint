@@ -4,6 +4,15 @@ A live 3D picture of Gothenburg built only from open data: trams, buses, ferries
 
 It is a **research tool you run on your own computer**, not a hosted website. Your copy talks to the public data sources directly, with your own (optional) API keys.
 
+**At a glance**
+
+- **53 open data sources** in one 3D view, most of them without a key.
+- **Live movement:** trams, buses, ferries, trains, ships, aircraft and satellites, matched to their tracks and streets and played back smoothly.
+- **What's going on:** police, crisis alerts, road incidents and works, weather and radar, water levels, air quality, noise, energy and the news.
+- **Analyst tools:** _What's here?_ for any spot, watch areas that alert you, a situation brief, routes, camera tours and export to GeoJSON or CSV.
+- **Seven days of history:** sparklines, tracks of ships, aircraft and trains, and a replay timeline.
+- **Runs on your machine** with `npm start` or Docker. Keys are optional and stay local.
+
 ![Göta älv in 3D with live trams, buses, ships and transit routes](docs/images/overview.jpg)
 
 | ![District statistics with road incidents, vehicles and the situation brief](docs/images/analyst.jpg) | !["What's here?" with nearby roadworks and the nearest road camera](docs/images/whats-here.jpg) | ![Thermal optics with the HUD and detection boxes](docs/images/optics.jpg) |
@@ -44,6 +53,14 @@ Every tram, bus and ferry with its line number, on the routes it follows. Trams 
 
 _Try it:_ turn on _Layers › Infrastructure › Public transport routes_ and pick the _Dark (Esri)_ map.
 
+### Which trains are running late
+
+![A tracked Västtågen train to Göteborg C, three minutes late, with its delay over the day](docs/images/rail.jpg)
+
+Every train in the area from Trafikverket, on the rails it runs on. The card shows the train number, where it is going, the last station it passed, how late it is and the operator: here Västtågen 3116 to Göteborg C, 3 minutes late after Liseberg. Rail disruptions appear in the feed with the stretch they affect, and the Göteborg C board lists the departures.
+
+_Try it:_ turn on _Layers › Movement › Trains (live, Trafikverket)_ and click a train.
+
 ### What's arriving at the port
 
 ![Ships on Göta älv and the board of ships expected at Gothenburg](docs/images/harbour.jpg)
@@ -60,17 +77,45 @@ Aircraft positions come from volunteer ADS-B receivers. Select one to see where 
 
 _Try it:_ the _Approach GOT_ mission, or the _Final approach, Landvetter_ tour (`S`).
 
+### Riding along
+
+![The view from a flight 78 km from Landvetter, with the airport's weather on the card](docs/images/cockpit.jpg)
+
+Select a tram, bus, ferry, ship or aircraft and press `C` to ride along. From the cockpit the card adds the weather at the flight's destination or origin: here a Norwegian flight from Riga, 4,300 m up and 78 km out, with Landvetter reporting light winds, good visibility (CAVOK) and QNH 1029.
+
+### What's happening on the roads
+
+![Road incidents, roadworks, travel times and road-camera viewing areas around the E6 and Göta älv](docs/images/roads.jpg)
+
+Trafikverket's incidents and roadworks, the city's own roadworks, measured travel times coloured by how the traffic flows, and the estimated view of each road camera. Click a camera for its latest picture. The cars on the roads are illustrative: their number follows the measured flow, but they are not real vehicles.
+
+_Try it:_ turn on _Road traffic_ and _Road travel times_ under _Movement_, and _Road cameras_ under _Cameras_.
+
 ### How long it takes across town
 
 ![A cycling route drawn over 3D buildings and the public transport network](docs/images/route.jpg)
 
 Press `G`, choose _Route A→B_ and click two points to get the distance and time on foot, by bike or by car. _Fly the route_ then follows it with the camera.
 
+### Noise and street works
+
+![The city's road-noise map over Majorna, Masthugget and Linné, with today's street-work permits](docs/images/noise-street-works.jpg)
+
+The city's 2023 road-noise calculation (24-hour average) as an overlay with its legend, and the street-work permits in force today: cable trenches, water-main digs and resurfacing, each with its address, the work hours and how it affects traffic, cycling and lanes.
+
+_Try it:_ turn on _Road traffic noise_ under _Environment_ and _Street works_ under _Events_.
+
 ### Get told when something happens in an area
 
 ![A watch area around Centralen with a "train entered" alert and the feed filtered to the area](docs/images/watch-area.jpg)
 
 Draw a watch area (`G` › _Watch_) and the app alerts you when a new incident appears inside it or a ship or train enters, also as a browser notification if you allow it. Here train 3550 to Alingsås has just entered. The feed's _In watch areas_ filter narrows 369 events down to the 31 inside the area.
+
+### What happened earlier
+
+![The replay timeline 45 minutes back, with ships, aircraft, trains and road incidents as they were](docs/images/replay.jpg)
+
+`P` opens a timeline over the last 7 days. Drag it back, or play it at up to an hour per second, to see where ships, aircraft and trains were and which events and readings were current. _Live_ returns to now, and the link keeps the moment you are looking at.
 
 ### Conditions now, and over the last day
 
@@ -141,6 +186,10 @@ All of these have a free tier. Some notes:
 - **Cesium ion:** the free Community plan is for non-commercial use.
 
 ## Using it
+
+| ![The Missions dialog with ready-made views](docs/images/missions.jpg) | ![The status dialog listing every source with its state and licence](docs/images/sources.jpg) | ![The export dialog with the items in view per layer](docs/images/export.jpg) |
+| :--------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------: |
+|                  Missions set up a view in one click                   |                         The status of every source, with its licence                          |                    Export what's in view as GeoJSON or CSV                    |
 
 ### The screen
 

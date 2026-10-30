@@ -711,6 +711,20 @@ select option {
   justify-content: space-between;
 }
 
+.export-layers {
+  max-width: 340px;
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  font: 12px var(--mono);
+}
+
+.export-layers li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .status-summary {
   display: grid;
   grid-template-columns: max-content 1fr;
