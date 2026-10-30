@@ -1,11 +1,13 @@
+import { Cartesian3, Cartographic, type Scene } from 'cesium';
 import { describe, expect, it, vi } from 'vitest';
 import { parseHash, serializeHash } from '../state/urlState';
 import { photoTilesFor } from '../state/streetPhotos';
 import { addKeyframe, recordedTour, routeTour, TOURS } from '../tours';
 import { buildingColor } from './buildings';
+import type { MarkerRenderer } from './markers';
 import { lonLatOfTile, tileOf, tilesAround } from './tiles';
 import { orbit, sampleTour, tourDuration, TourPlayer, type TourKeyframe } from './tours';
-import { cabMount } from './tracker';
+import { cabMount, CameraTracker } from './tracker';
 import { MODELS } from './vehicleModels';
 import { viewWedge, VIEW_RANGE_M } from './viewsheds';
 
@@ -169,6 +171,35 @@ describe('ride-along', () => {
     expect(ship.forward).toBeCloseTo(MODELS.cargo.length + 1, 9);
     expect(ship.up).toBeGreaterThan(20);
     expect(cabMount({ icon: 'aircraft' }).pitchDeg).toBeLessThan(0);
+  });
+
+  it('rides at driver height, without the 50 m camera height clamp', () => {
+    const controller = { enableInputs: true, enableCollisionDetection: true };
+    const camera = { heading: 0, lookAtTransform: vi.fn(), setView: vi.fn() };
+    const scene = {
+      screenSpaceCameraController: controller,
+      camera,
+      requestRender: vi.fn(),
+      isDestroyed: () => false,
+    } as unknown as Scene;
+    const renderer = {
+      positionOf: () => Cartesian3.fromDegrees(11.97, 57.7, 0),
+      specOf: () => ({ icon: 'vehicle', model: { kind: 'tram', accent: '#fff', range: 1 } }),
+      headingOf: () => 90,
+    } as unknown as MarkerRenderer;
+    const tracker = new CameraTracker(scene, renderer);
+    tracker.start('tram', 500);
+    expect(controller).toEqual({ enableInputs: true, enableCollisionDetection: true });
+    tracker.setView('cab');
+    expect(controller).toEqual({ enableInputs: false, enableCollisionDetection: false });
+    tracker.update();
+    const eye = Cartographic.fromCartesian(camera.setView.mock.calls[0]![0].destination);
+    expect(eye.height).toBeCloseTo(cabMount(renderer.specOf('tram')!).up, 2);
+    tracker.setView('chase');
+    expect(controller.enableCollisionDetection).toBe(true);
+    tracker.setView('cab');
+    tracker.stop();
+    expect(controller).toEqual({ enableInputs: true, enableCollisionDetection: true });
   });
 
   it('keeps ride-along in share links only while tracking', () => {

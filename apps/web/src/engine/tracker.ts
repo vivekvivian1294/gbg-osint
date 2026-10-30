@@ -85,6 +85,7 @@ export class CameraTracker {
   stop(): void {
     if (this.scene.isDestroyed()) return;
     this.scene.screenSpaceCameraController.enableInputs = true;
+    this.scene.screenSpaceCameraController.enableCollisionDetection = true;
     if (!this.key) return;
     this.key = null;
     this.scene.camera.lookAtTransform(Matrix4.IDENTITY);
@@ -122,7 +123,11 @@ export class CameraTracker {
   }
 
   private applyView(): void {
-    this.scene.screenSpaceCameraController.enableInputs = !(this.key && this.view === 'cab');
+    const cab = Boolean(this.key && this.view === 'cab');
+    const controller = this.scene.screenSpaceCameraController;
+    controller.enableInputs = !cab;
+    // The height clamp would lift a driver's-eye camera to the minimum zoom distance (50 m).
+    controller.enableCollisionDetection = !cab;
     if (!this.key) return;
     const spec = this.renderer.specOf(this.key);
     if (spec) this.mount = cabMount(spec);

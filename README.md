@@ -79,9 +79,11 @@ _Try it:_ the _Approach GOT_ mission, or the _Final approach, Landvetter_ tour (
 
 ### Riding along
 
-![The view from a flight 78 km from Landvetter, with the airport's weather on the card](docs/images/cockpit.jpg)
+| ![The driver's view from tram 6 on Linnégatan, with the route lines along the track](docs/images/tram-cab.jpg) | ![The view from a flight 78 km from Landvetter, with the airport's weather on the card](docs/images/cockpit.jpg) |
+| :------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------: |
+|                                        From the driver's cab of a tram                                         |                                   From the cockpit, with the airport's weather                                   |
 
-Select a tram, bus, ferry, ship or aircraft and press `C` to ride along. From the cockpit the card adds the weather at the flight's destination or origin: here a Norwegian flight from Riga, 4,300 m up and 78 km out, with Landvetter reporting light winds, good visibility (CAVOK) and QNH 1029.
+Select a tram, bus, ferry, ship or aircraft and press `C` to ride along: the camera sits in the driver's cab, on the bridge or in the cockpit and looks where the vehicle is heading. From the cockpit the card adds the weather at the flight's destination or origin: here a Norwegian flight from Riga, 4,300 m up and 78 km out, with Landvetter reporting light winds, good visibility (CAVOK) and QNH 1029.
 
 ### What's happening on the roads
 

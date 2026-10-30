@@ -378,6 +378,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Ride-along (`C`, or “Ride along” in the card):**
   - Driver's view for trams, buses, trains and ferries; bow view for ships; forward view for aircraft.
   - It is saved in share links (`ride=1`).
+  - The camera sits at driver height (about 3 m for trams): Cesium's height clamp, which keeps the free camera 50 m above the ground, is off while riding along (fixed 2026-10-30; it had lifted every cab view to 50 m). On curves the view can briefly face a building, as it looks along the vehicle's heading.
 - **Scene director (`S`, Scenes button):**
   - Four tours: *Göta älv from the sea*, *Inner city orbit*, *Port of Gothenburg* and *Final approach, Landvetter*.
   - Record your own tour from views you add.
