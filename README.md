@@ -148,6 +148,8 @@ npm start
 
 Then open **http://localhost:8787**. `npm start` builds the app and runs it as one process. Stop it with `Ctrl+C`.
 
+For a stable version rather than the latest work, use a [release](https://github.com/vivekvivian1294/gbg-osint/releases): clone with `--branch v1.0.0`, or download the source archive from the release page.
+
 On the first start:
 
 - The _Missions_ dialog suggests some ready-made views. `?` shows the keyboard shortcuts at any time.
@@ -294,7 +296,7 @@ Settings go in `.env` with the keys (see `.env.example`). All are optional.
 | `HOST`                      | `127.0.0.1`                        | Address to listen on. Keep it local.                           |
 | `PORT`                      | `8787`                             | Port for the app                                               |
 | `CACHE_DIR`                 | `<OS temp folder>/gbg-osint-cache` | Where downloaded data and history are kept                     |
-| `UPSTREAM_USER_AGENT`       | `gbg-osint-dashboard/0.1`          | Sent to the data sources; add your e-mail or repo URL          |
+| `UPSTREAM_USER_AGENT`       | `gbg-osint-dashboard/1.0`          | Sent to the data sources; add your e-mail or repo URL          |
 | `LOG_LEVEL`                 | `info`                             | `fatal`, `error`, `warn`, `info`, `debug`, `trace` or `silent` |
 | `RATE_LIMIT_PER_MINUTE`     | `120`                              | API requests per minute per client                             |
 | `WS_MAX_CONNECTIONS_PER_IP` | `10`                               | Live connections per client (one per open tab)                 |

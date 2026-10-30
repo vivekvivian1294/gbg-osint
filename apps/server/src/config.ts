@@ -14,7 +14,7 @@ const ConfigSchema = z.object({
     .default(''),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(120),
   WS_MAX_CONNECTIONS_PER_IP: z.coerce.number().int().positive().default(10),
-  UPSTREAM_USER_AGENT: z.string().min(1).max(200).default('gbg-osint-dashboard/0.1'),
+  UPSTREAM_USER_AGENT: z.string().min(1).max(200).default('gbg-osint-dashboard/1.0'),
   /** Where connectors cache slow-changing upstream data. Defaults to the OS temp directory. */
   CACHE_DIR: z.string().min(1).optional(),
   /** CARTO basemap key; it is sent to the browser, so use a key restricted to CARTO basemaps. */

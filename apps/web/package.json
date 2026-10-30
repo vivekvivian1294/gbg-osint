@@ -1,6 +1,6 @@
 {
   "name": "@gbg-osint/web",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@gbg-osint/shared": "^0.1.0",
+    "@gbg-osint/shared": "^1.0.0",
     "cesium": "^1.146.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

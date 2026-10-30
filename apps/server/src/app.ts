@@ -16,7 +16,7 @@ import { registerGateway } from './realtime/gateway';
 import { registerApiRoutes } from './routes/api';
 import { CSP_DIRECTIVES, registerWebApp } from './web';
 
-export const VERSION = '0.1.0';
+export const VERSION = '1.0.0';
 
 export interface BuildAppOptions {
   config: Config;
