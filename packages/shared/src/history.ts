@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { IsoTime } from './model';
+import { ChannelItemSchema, IsoTime } from './model';
 
-/** `[epoch ms, value]` samples of one series over the last 24 hours, oldest first. */
+/** How long the server keeps history for trends and replay. */
+export const HISTORY_DAYS = 7;
+
+/** `[epoch ms, value]` samples of one series, oldest first (5-minute steps, or averages over longer spans). */
 export const SeriesSchema = z.object({
   key: z.string().min(1).max(200),
   unit: z.string().max(32),
@@ -9,7 +12,7 @@ export const SeriesSchema = z.object({
 });
 export type Series = z.infer<typeof SeriesSchema>;
 
-/** Where a moving object has been in the last 24 hours: `[epoch ms, lon, lat, alt m]`, oldest first. */
+/** Where a moving object has been: `[epoch ms, lon, lat, alt m]`, oldest first. */
 export const TrackSchema = z.object({
   key: z.string().min(1).max(200),
   points: z.array(z.tuple([z.number(), z.number(), z.number(), z.number()])).max(2000),
@@ -27,12 +30,35 @@ export const ENTITY_SERIES: Readonly<Record<string, Readonly<Record<string, stri
   'transit.rail': { delayMin: 'min' },
 };
 
-/** Moving objects with a 24-hour track. Västtrafik vehicles and anonymised craft have none. */
+/** Moving objects with a track. Västtrafik vehicles and anonymised craft have none. */
 export const TRACK_CHANNELS: ReadonlySet<string> = new Set([
   'maritime.ships',
   'aviation.aircraft',
   'transit.rail',
 ]);
+
+/** Entity channels replay can show at a past moment (with every events and metrics channel). */
+export const REPLAY_ENTITY_CHANNELS: ReadonlySet<string> = new Set([
+  ...TRACK_CHANNELS,
+  ...Object.keys(ENTITY_SERIES),
+  'env.wind',
+]);
+
+/** Oldest and newest moments in the history, in epoch ms (null while it is empty). */
+export const HistoryRangeSchema = z.object({
+  from: z.number().nullable(),
+  to: z.number().nullable(),
+});
+export type HistoryRange = z.infer<typeof HistoryRangeSchema>;
+
+/** What the replayable channels held at a past moment. */
+export const ReplaySchema = z.object({
+  t: z.number(),
+  channels: z.array(
+    z.object({ channel: z.string().max(64), items: z.array(ChannelItemSchema).max(5000) }),
+  ),
+});
+export type Replay = z.infer<typeof ReplaySchema>;
 
 export const BriefLevel = z.enum(['info', 'notice', 'warning', 'alert']);
 export type BriefLevel = z.infer<typeof BriefLevel>;

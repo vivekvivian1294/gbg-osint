@@ -1206,7 +1206,8 @@ kbd {
 /* Radar timeline and tour bar */
 
 .radar-timeline,
-.tour-bar {
+.tour-bar,
+.replay-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
@@ -1222,8 +1223,31 @@ kbd {
   backdrop-filter: blur(6px);
 }
 
-.radar-timeline {
+.radar-timeline,
+.replay-bar {
   bottom: calc(var(--bottombar-h) + var(--gap));
+}
+
+.replay-bar {
+  gap: 8px;
+  border-color: #f59e0b;
+}
+
+.replay-bar input[type='range'] {
+  width: min(360px, 30vw);
+  accent-color: #f59e0b;
+}
+
+.replay-badge {
+  padding: 1px 6px;
+  color: #111;
+  font-weight: 700;
+  background: #f59e0b;
+  border-radius: 3px;
+}
+
+.replay-time {
+  white-space: nowrap;
 }
 
 .tour-bar {

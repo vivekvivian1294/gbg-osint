@@ -15,14 +15,17 @@ export interface UrlState {
   track?: TrackRef;
   /** Ride along with the tracked object (cab view). */
   ride?: boolean;
+  /** Replayed moment in epoch ms; absent when live. */
+  time?: number;
 }
 
 const LAYER_ID = /^[a-z0-9-]{1,40}$/;
 const MAX_LAYERS = 50;
 const MAX_ID_LENGTH = 128;
+const EPOCH_MS = /^\d{13}$/;
 
 /**
- * Parses `#cam=lon,lat,height,heading,pitch&map=dark&layers=a,b&style=nvg&hud=1&det=1&track=layer:id&ride=1`,
+ * Parses `#cam=lon,lat,height,heading,pitch&map=dark&layers=a,b&style=nvg&hud=1&det=1&track=layer:id&ride=1&t=epochMs`,
  * ignoring anything invalid.
  */
 export function parseHash(hash: string): UrlState {
@@ -53,6 +56,8 @@ export function parseHash(hash: string): UrlState {
     state.track = track;
     if (params.get('ride') === '1') state.ride = true;
   }
+  const time = params.get('t');
+  if (time && EPOCH_MS.test(time)) state.time = Number(time);
   return state;
 }
 
@@ -100,6 +105,7 @@ export function serializeHash(state: UrlState): string {
     parts.push(`track=${state.track.layerId}:${encodeURIComponent(state.track.id)}`);
     if (state.ride) parts.push('ride=1');
   }
+  if (state.time !== undefined) parts.push(`t=${Math.round(state.time)}`);
   return parts.join('&');
 }
 

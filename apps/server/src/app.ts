@@ -2,6 +2,7 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyError } from 'fastify';
+import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Config } from './config';
@@ -23,7 +24,7 @@ export interface BuildAppOptions {
   env?: NodeJS.ProcessEnv;
   /** Built web app to serve (apps/web/dist); skipped when it hasn't been built. */
   webRoot?: string;
-  /** Keep the 24-hour history on disk across restarts (off in tests). */
+  /** Keep history in `history.db` in the cache directory (in memory in tests). */
   persistHistory?: boolean;
 }
 
@@ -51,8 +52,10 @@ export async function buildApp({
     userAgent: config.UPSTREAM_USER_AGENT,
     cacheDir,
   });
+  if (persistHistory) mkdirSync(cacheDir, { recursive: true });
   const { history, stop: stopHistory } = await startHistory(
     store,
+    persistHistory ? join(cacheDir, 'history.db') : ':memory:',
     persistHistory ? createDiskCache(cacheDir, 'history') : NO_CACHE,
     app.log,
   );

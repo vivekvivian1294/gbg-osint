@@ -38,6 +38,7 @@ import { MetricsStrip, type MetricGroup } from './components/MetricsStrip';
 import { MissionsDialog } from './components/MissionsDialog';
 import { RadarTimeline, TourBar } from './components/Playbars';
 import { RadioPanel } from './components/RadioPanel';
+import { ReplayBar } from './components/ReplayBar';
 import { ScenesDialog } from './components/ScenesDialog';
 import { SelectionCard } from './components/SelectionCard';
 import { SpotReport } from './components/SpotReport';
@@ -77,6 +78,13 @@ import { useCatalog, useLive } from './state/hooks';
 import { useTrack } from './state/history';
 import { LiveClient } from './state/live';
 import { createStore } from './state/store';
+import {
+  isReplayable,
+  STATIC_CHANNELS,
+  useHistoryRange,
+  useReplay,
+  type ReplayState,
+} from './state/replay';
 import { useStreetPhotos } from './state/streetPhotos';
 import { useTools } from './state/tools';
 import { useSpot } from './state/spot';
@@ -101,6 +109,10 @@ const MAX_ALERTS = 30;
 /** Browser notifications per batch; the rest are listed in the Watch tool. */
 const MAX_NOTIFICATIONS = 3;
 const PHOTO_CHANNEL = 'photos.street';
+/** Replay opens this far back. */
+const REPLAY_START_MS = 3600_000;
+const REPLAY_TICK_MS = 1000;
+const replayAt = (t: number): ReplayState => ({ t, playing: false, speed: 60 });
 /** Layers whose objects have a sensible cab or bow view. */
 const RIDE_LAYERS = new Set(['transit', 'ships', 'aircraft']);
 
@@ -164,6 +176,9 @@ export function App() {
   const [selection, setSelection] = useState<PickRef | null>(null);
   const [tracked, setTracked] = useState<TrackRef | null>(initial.track ?? null);
   const [ride, setRide] = useState(initial.ride ?? false);
+  const [replay, setReplay] = useState<ReplayState | null>(() =>
+    initial.time !== undefined ? replayAt(initial.time) : null,
+  );
   const [districtMetric, setDistrictMetric] = useState(DEFAULT_DISTRICT_METRIC);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [radio, setRadio] = useState<RadioStation | null>(null);
@@ -229,6 +244,29 @@ export function App() {
   const isActive = (layerId: string) => activeLayers.some((l) => l.id === layerId);
   const photos = useStreetPhotos(isActive('street-photos'), camera);
 
+  const replaying = replay !== null;
+  const replayT = replay?.t;
+  const replayPlaying = replay?.playing ?? false;
+  const replayChannels = useMemo(
+    () => (replaying ? activeChannels.filter((c) => isReplayable(c, channelKinds.get(c))) : []),
+    [replaying, activeChannels, channelKinds],
+  );
+  const replayData = useReplay(replay?.t ?? null, replayChannels);
+  const historyRange = useHistoryRange(replaying);
+  useEffect(() => {
+    if (!replayPlaying) return;
+    const timer = setInterval(() => {
+      setReplay((r) => {
+        if (!r) return r;
+        const t = r.t + r.speed * REPLAY_TICK_MS;
+        const now = Date.now();
+        return t >= now ? { ...r, t: now, playing: false } : { ...r, t };
+      });
+    }, REPLAY_TICK_MS);
+    return () => clearInterval(timer);
+  }, [replayPlaying]);
+  const toggleReplay = () => setReplay((r) => (r ? null : replayAt(Date.now() - REPLAY_START_MS)));
+
   const watching = tools.watchAreas.length > 0;
   const watchList = useMemo(
     () => (watching ? watchChannels(channelKinds) : []),
@@ -277,12 +315,17 @@ export function App() {
       detection,
       terrain,
       ...(tracked && { track: tracked, ride }),
+      ...(replayT !== undefined && { time: replayT }),
     });
-  }, [camera, basemap, enabled, style, hud, detection, terrain, tracked, ride]);
+  }, [camera, basemap, enabled, style, hud, detection, terrain, tracked, ride, replayT]);
 
   // Derived from live data on every render; useLive re-renders this component on updates.
-  const itemsOf = (channel: string): ChannelItem[] =>
-    channel === PHOTO_CHANNEL ? [...photos] : live.items(channel);
+  // During replay, channels with history show the replayed moment and the rest stay empty.
+  const itemsOf = (channel: string): ChannelItem[] => {
+    if (!replaying) return channel === PHOTO_CHANNEL ? [...photos] : live.items(channel);
+    if (STATIC_CHANNELS.has(channel)) return live.items(channel);
+    return replayData?.items.get(channel) ?? [];
+  };
   const markers = buildMarkers(activeLayers, channelKinds, itemsOf);
   const featureSet = (layerId: string): FeatureSet | null => {
     const channel = activeLayers.find((l) => l.id === layerId)?.channels[0];
@@ -318,9 +361,13 @@ export function App() {
       if (typeof color === 'string') lineColors.set(lineKey(e.props?.mode, e.props?.line), color);
     }
   }
+  const replayWind = replayData?.items.get('env.wind');
   const wind = useMemo(
-    () => (windVersion < 0 ? null : buildWindField(live.items('env.wind'))),
-    [live, windVersion],
+    () =>
+      windVersion < 0
+        ? null
+        : buildWindField(replaying ? (replayWind ?? []) : live.items('env.wind')),
+    [live, windVersion, replaying, replayWind],
   );
   const centreWind = wind && centre ? windAt(wind, centre[0], centre[1]) : undefined;
 
@@ -650,6 +697,7 @@ export function App() {
       setDetection(s.detection ?? false);
       setTerrain(s.terrain ?? false);
       setSelection(null);
+      setReplay(s.time !== undefined ? replayAt(s.time) : null);
       if (s.track) {
         track(s.track);
         setRide(s.ride ?? false);
@@ -714,6 +762,10 @@ export function App() {
         case 'n':
         case 'N':
           toggleRight('brief');
+          break;
+        case 'p':
+        case 'P':
+          toggleReplay();
           break;
         case '?':
           setDialog('help');
@@ -837,6 +889,8 @@ export function App() {
           if (toolsOpen) tools.setMode(null);
           setToolsOpen(!toolsOpen);
         }}
+        replaying={replaying}
+        onToggleReplay={toggleReplay}
         onOpenMissions={() => setDialog('missions')}
         onOpenScenes={() => setDialog('scenes')}
         onShare={share}
@@ -1015,6 +1069,15 @@ export function App() {
           store={radarStore}
           onPlay={(playing) => globeRef.current?.radarPlay(playing)}
           onSeek={(index) => globeRef.current?.radarSeek(index)}
+        />
+      )}
+      {replay && (
+        <ReplayBar
+          replay={replay}
+          range={historyRange}
+          shownT={replayData?.t ?? null}
+          onChange={(next) => setReplay((r) => (r ? { ...r, ...next } : r))}
+          onLive={() => setReplay(null)}
         />
       )}
       <TourBar store={tourStore} onStop={() => globeRef.current?.stopTour()} />

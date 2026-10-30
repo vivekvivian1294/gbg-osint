@@ -52,4 +52,12 @@ describe('url state', () => {
     expect(parseHash(`#track=aircraft:${'x'.repeat(129)}`)).toEqual({});
     expect(serializeHash({ style: 'normal' })).toBe('');
   });
+
+  it('round-trips a replayed moment and ignores malformed ones', () => {
+    expect(serializeHash({ time: 1793361946334.4 })).toBe('t=1793361946334');
+    expect(parseHash('#t=1793361946334')).toEqual({ time: 1793361946334 });
+    for (const bad of ['#t=', '#t=17933619463', '#t=1793361946334.5', '#t=-1793361946334']) {
+      expect(parseHash(bad), bad).toEqual({});
+    }
+  });
 });

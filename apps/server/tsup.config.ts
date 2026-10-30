@@ -9,4 +9,6 @@ export default defineConfig({
   sourcemap: true,
   // The shared package ships TypeScript source, so it must be bundled.
   noExternal: ['@gbg-osint/shared'],
+  // `node:sqlite` only exists with its prefix.
+  removeNodeProtocol: false,
 });

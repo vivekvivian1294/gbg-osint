@@ -7,6 +7,9 @@ import {
   type GeoEvent,
   type Metric,
 } from '@gbg-osint/shared';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { anomaly, buildBrief } from './brief';
 import { delayIndex, lateCount } from './delays';
@@ -121,7 +124,7 @@ describe('History', () => {
     expect(history.trackOf('maritime.ships/anon-1')).toBeUndefined();
   });
 
-  it('drops samples older than 24 hours and restores a saved snapshot', () => {
+  it('keeps seven days, answers the last 24 hours by default and imports the old history', () => {
     const snapshot: HistorySnapshot = {
       series: {
         'env.weather/71420-temp': {
@@ -131,22 +134,102 @@ describe('History', () => {
             [T0 - HOUR, 2],
           ],
         },
-        'env.weather/old': { unit: '°C', points: [[T0 - 30 * HOUR, 1]] },
+        'env.weather/old': { unit: '°C', points: [[T0 - 8 * 24 * HOUR, 1]] },
       },
       tracks: { 'aviation.aircraft/abc123': [[T0 - 26 * HOUR, 12, 57.6, 3000]] },
     };
     const history = new History();
     history.restore(snapshot, T0);
     expect(history.seriesOf('env.weather/71420-temp')?.points).toEqual([[T0 - HOUR, 2]]);
-    expect(history.seriesOf('env.weather/old')).toBeUndefined();
+    expect(history.seriesOf('env.weather/71420-temp', T0 - 48 * HOUR)?.points).toHaveLength(2);
+    expect(history.seriesOf('env.weather/old', 0)).toBeUndefined();
     expect(history.trackOf('aviation.aircraft/abc123')).toBeUndefined();
-    expect(history.hours(T0)).toBe(1);
+    expect(history.trackOf('aviation.aircraft/abc123', T0 - 48 * HOUR)?.points).toEqual([
+      [T0 - 26 * HOUR, 12, 57.6, 3000],
+    ]);
+    expect(history.hours(T0)).toBe(25);
+    expect(history.range()).toEqual({ from: T0 - 26 * HOUR, to: T0 });
+  });
 
-    const copy = new History();
-    copy.restore(JSON.parse(JSON.stringify(history.snapshot())) as HistorySnapshot, T0);
-    expect(copy.seriesOf('env.weather/71420-temp')).toEqual(
-      history.seriesOf('env.weather/71420-temp'),
-    );
+  it('averages long spans down to at most 1000 points', () => {
+    const history = new History();
+    const points = Array.from({ length: 7 * 288 }, (_, i): [number, number] => [
+      T0 - (7 * 288 - i) * 5 * MIN,
+      i % 2,
+    ]);
+    history.restore({ series: { 'env.weather/t': { unit: '°C', points } }, tracks: {} }, T0);
+    const week = history.seriesOf('env.weather/t', T0 - 7 * 24 * HOUR)!.points;
+    expect(week.length).toBeLessThanOrEqual(1000);
+    expect(week.length).toBeGreaterThan(600);
+    expect(week[1]![0] - week[0]![0]).toBe(15 * MIN);
+    expect(week[0]![1]).toBeCloseTo(1 / 3, 2);
+    expect(week[1]![1]).toBeCloseTo(2 / 3, 2);
+  });
+
+  it('survives a restart in a file', () => {
+    const path = join(mkdtempSync(join(tmpdir(), 'gbg-history-')), 'history.db');
+    const store = new ChannelStore();
+    store.register('env.weather', 'metrics', 'smhi');
+    store.replace('env.weather', [metric('71420-temp', 7)]);
+    const first = new History(path);
+    first.sample(store, T0);
+    first.close();
+    const second = new History(path);
+    second.sample(store, T0 + 2 * MIN);
+    expect(second.seriesOf('env.weather/71420-temp', T0 - HOUR)?.points).toEqual([[T0, 7]]);
+    second.close();
+  });
+});
+
+describe('replay', () => {
+  const ship = (id: string, lon: number, props: Record<string, unknown> = {}) =>
+    entity({ id, kind: 'ship', lon, lat: 57.7, heading: 90, label: id, props });
+
+  function recorded() {
+    const store = new ChannelStore();
+    store.register('maritime.ships', 'entities', 'ais');
+    store.register('events.road', 'events', 'trafikverket');
+    store.register('env.harbour', 'entities', 'viva');
+    store.register('env.weather', 'metrics', 'smhi');
+    store.register('transit.vehicles', 'entities', 'vasttrafik');
+    const history = new History();
+    for (let i = 0; i <= 40; i++) {
+      const t = T0 + i * MIN;
+      store.replace('maritime.ships', [
+        ship('265000001', 11.8 + i * 0.001, { speedKn: 10 + i }),
+        ship('anon-1', 11.7),
+      ]);
+      store.replace('events.road', i < 20 ? [event({ id: 'a' })] : []);
+      store.replace('env.harbour', [
+        entity({ id: 'viva-1', label: 'Vinga', props: { windMs: i < 20 ? 5 : 12 } }),
+      ]);
+      store.replace('env.weather', [metric('71420-temp', i)]);
+      store.replace('transit.vehicles', [entity({ id: 'tram-1', kind: 'tram' })]);
+      history.sample(store, t);
+    }
+    return { store, history };
+  }
+
+  it('shows what was there at a past moment', () => {
+    const { store, history } = recorded();
+    const channels = store.list();
+    const at = (t: number) => Object.fromEntries(history.at(t, channels));
+
+    const early = at(T0 + 10 * MIN + 30_000);
+    expect(early['events.road']?.map((e) => e.id)).toEqual(['a']);
+    expect(early['transit.vehicles']).toBeUndefined();
+    const [s] = early['maritime.ships'] as Entity[];
+    expect(early['maritime.ships']).toHaveLength(1);
+    expect(s).toMatchObject({ id: '265000001', label: '265000001', heading: 90 });
+    expect(s!.lon).toBeCloseTo(11.8105, 4);
+    expect(s!.ts).toBe(iso(T0 + 10 * MIN + 30_000));
+    expect(early['env.harbour']?.[0]).toMatchObject({ props: { windMs: 5 } });
+    expect(early['env.weather']?.[0]).toMatchObject({ id: '71420-temp', name: '71420-temp' });
+
+    const late = at(T0 + 35 * MIN);
+    expect(late['events.road']).toEqual([]);
+    expect(late['env.harbour']?.[0]).toMatchObject({ props: { windMs: 12 } });
+    expect(at(T0 - HOUR)['maritime.ships']).toEqual([]);
   });
 });
 

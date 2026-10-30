@@ -1,4 +1,4 @@
-import { BriefSchema, SpotReportSchema, type ServerMessage } from '@gbg-osint/shared';
+import { BriefSchema, ReplaySchema, SpotReportSchema, type ServerMessage } from '@gbg-osint/shared';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -146,8 +146,49 @@ describe('HTTP API', () => {
       '/api/history/series?prefix=test.metrics',
       '/api/history/series?prefix=..%2F',
       '/api/history/series?prefix=a/b/c/',
+      '/api/history/series?prefix=test.metrics/&hours=0',
+      '/api/history/series?prefix=test.metrics/&hours=169',
+      '/api/history/series?prefix=test.metrics/&hours=1e2',
       '/api/history/track/Bad%20Channel/1',
       '/api/history/track/maritime.ships/a%20b',
+      '/api/history/track/maritime.ships/1?hours=-1',
+    ]) {
+      expect((await app.inject(path)).statusCode, path).toBe(404);
+    }
+  });
+
+  it('replays a past moment of the history', async () => {
+    const { app, store, history } = await setup();
+    const now = Date.now();
+    store.replace('test.metrics', [metric]);
+    history.sample(store, now - 10 * 60_000);
+
+    const week = await app.inject('/api/history/series?prefix=test.metrics/&hours=168');
+    expect(week.json().series[0].points).toHaveLength(1);
+    expect((await app.inject('/api/history/range')).json()).toEqual({
+      from: now - 10 * 60_000,
+      to: now - 10 * 60_000,
+    });
+
+    const t = now - 5 * 60_000;
+    const replay = await app.inject(`/api/history/at?t=${t}&channels=test.metrics,nope.channel`);
+    expect(ReplaySchema.parse(replay.json())).toEqual({
+      t,
+      channels: [
+        {
+          channel: 'test.metrics',
+          items: [{ ...metric, ts: new Date(now - 10 * 60_000).toISOString() }],
+        },
+      ],
+    });
+
+    for (const path of [
+      '/api/history/at',
+      `/api/history/at?t=${now + 60_000}&channels=test.metrics`,
+      `/api/history/at?t=${now - 8 * 24 * 3600_000}&channels=test.metrics`,
+      `/api/history/at?t=${t}.5&channels=test.metrics`,
+      `/api/history/at?t=${t}&channels=..%2Fetc`,
+      `/api/history/at?t=${t}&channels=${Array.from({ length: 51 }, (_, i) => `a.b${i}`).join()}`,
     ]) {
       expect((await app.inject(path)).statusCode, path).toBe(404);
     }

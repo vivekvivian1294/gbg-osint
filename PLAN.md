@@ -518,11 +518,13 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 5. Weather extras and seasonal layers. ✅
 6. The 6.5 items as keys arrive.
 
-### Phase 7 – History and replay
-- Postgres with PostGIS and TimescaleDB, replacing the Phase 6 in-memory buffers.
-- Store events, metrics and object tracks.
-- Add a timeline scrubber and replay, and show trends (e.g. delays per line, air quality per week).
-- Turn the Phase 6 anomaly flags into alerts over longer baselines.
+### Phase 7 – History and replay (in progress)
+- ✅ **Storage:** SQLite built into Node (`node:sqlite`) instead of Postgres, so `npm start` and the single Docker image need nothing extra. One file, `history.db`, in the cache directory; the 24-hour JSON history of Phase 6 is imported once.
+  - 7 days in full detail: 5-minute series (as before), tracks of ships, aircraft and trains (with heading), and for every event, every reading and the replayed objects when they were present and what they said (a new version at most every 15 minutes).
+  - Writes are batched per minute; presence is checkpointed every 10 minutes and on shutdown. Pruned hourly. Expected size: well under 100 MB.
+  - API: `series` and `track` take `?hours=` (1–168; spans over a day are averaged to at most 1,000 points), `GET /api/history/range`, and `GET /api/history/at?t=<epoch ms>&channels=…` for a past moment (positions interpolated between track points). A snapshot takes about 20 ms.
+- ✅ **Replay** (`P`, or *Replay* in the top bar): a timeline over the stored days with −15/+15 minutes, play at 1 min, 10 min or 1 h per second, and *Live*. Events, readings, ships, aircraft, trains, sensors and the wind field show the replayed moment; trams and buses, boards, cameras, radar and other live-only layers are empty, and districts, stops, routes and waterways stay as they are. The moment is kept in the link (`t=`). Watch alerts and the brief stay live.
+- Next: trends over the week (delays per line, air quality, incidents per day) and anomaly flags against hour-of-day baselines.
 
 ### Phase 8 – Share as an open research tool (replaces the public launch)
 - ✅ One process serves the API, the WebSocket and the built web app, with the CSP and security headers. Caddy is gone.

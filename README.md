@@ -144,7 +144,7 @@ All of these have a free tier. Some notes:
 
 ### The screen
 
-- **Top bar:** _Layers_ turns sources on and off. _Feed_, _Boards_, _Brief_ and _Radio_ open the side panel, and _Tools_ the map tools. Then come the search box, the base map, the optics style, _HUD_, _DET_ (detection boxes), _3D_ (only with a Cesium ion token), _Missions_, _Scenes_, _Share_, _Export_, _Reset_ and `?`. The status button on the far right shows the live connection; click it for the state of every source.
+- **Top bar:** _Layers_ turns sources on and off. _Feed_, _Boards_, _Brief_ and _Radio_ open the side panel, _Tools_ the map tools and _Replay_ the timeline. Then come the search box, the base map, the optics style, _HUD_, _DET_ (detection boxes), _3D_ (only with a Cesium ion token), _Missions_, _Scenes_, _Share_, _Export_, _Reset_ and `?`. The status button on the far right shows the live connection; click it for the state of every source.
 - **Metrics strip:** current conditions such as weather, sea and river levels and the electricity price. Hover it for 24-hour sparklines.
 - **Bottom bar:** camera position, heading and pitch, UTC and Gothenburg time, and the credits for what is on screen.
 
@@ -162,6 +162,7 @@ All of these have a free tier. Some notes:
 | `/`            | Search                                                                          |
 | `B`            | Departure boards                                                                |
 | `N`            | Now in Gothenburg (situation brief)                                             |
+| `P`            | Replay: scrub back through the last 7 days                                      |
 | `W`            | What's here? at the centre of the view                                          |
 | `M`            | Missions                                                                        |
 | `S`            | Scene director (camera tours)                                                   |
@@ -191,6 +192,10 @@ Right-click the map (long-press on touch, or `W` for the centre of the view) for
 - **Feed:** live events (police, crisis, roads, rail, news, social and more), filtered by category, severity, time, what's in view or what's inside a watch area.
 - **Boards (`B`):** departures for the tram, bus and ferry hubs, Göteborg C, Landvetter and the road ferries, plus the ships expected at Gothenburg.
 - **Brief (`N`):** "Now in Gothenburg": unusual readings, new serious road incidents and the transit delay index.
+
+### Replay
+
+`P` (or _Replay_) opens a timeline over the last 7 days. Scrub or play it back at 1 minute, 10 minutes or an hour per second to see events, readings, ships, aircraft and trains as they were. Trams, buses, boards and other live-only layers are empty while replaying, and _Live_ (or `P` again) returns to now. The link keeps the replayed moment.
 
 ### Tools
 
@@ -225,6 +230,7 @@ For example `http://localhost:8787/#cam=11.97,57.70,4000,0,-60&map=dark&layers=t
 | `style`                 | Optics: `normal`, `crt`, `nvg`, `flir`, `ironbow`, `noir`                  |
 | `hud`, `det`, `terrain` | `1` turns on the HUD, detection boxes or 3D terrain                        |
 | `track`                 | `<layer>:<id>` of the object to follow; add `ride=1` to ride along with it |
+| `t`                     | A moment to replay, in milliseconds since 1970 (UTC)                       |
 
 </details>
 
@@ -247,7 +253,7 @@ Settings go in `.env` with the keys (see `.env.example`). All are optional.
 
 - The server polls each source on its own schedule, within the provider's limits, and pushes changes to your browser over a WebSocket. On-demand data (radar, buildings, street photos, routes, flight routes, Wikipedia, addresses and satellite images) is only fetched when you look at it.
 - Slow-changing data is cached on disk in `CACHE_DIR`: the street and rail network used to match vehicles to the map, buildings, district boundaries and statistics, station names and the timetable. Your OS may clear its temp folder, so point `CACHE_DIR` at a permanent folder to avoid downloading it all again. Docker keeps it in the `cache` volume.
-- History covers the last 24 hours in 5-minute steps (readings, delays and event counts) plus the tracks of ships, aircraft and trains. It is saved in `CACHE_DIR/history`, so it survives restarts.
+- History covers the last 7 days: readings, delays and event counts in 5-minute steps, the tracks of ships, aircraft and trains, and when each event and object was present. It lives in `CACHE_DIR/history.db` (SQLite, built into Node), so it survives restarts.
 - Pins, watch areas and tours live in your browser's local storage.
 - To start over, stop the server and delete the cache folder.
 

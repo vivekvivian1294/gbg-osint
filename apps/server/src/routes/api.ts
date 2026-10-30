@@ -1,7 +1,13 @@
-import { ChannelName, type ClientConfig, type Health } from '@gbg-osint/shared';
+import {
+  ChannelName,
+  HISTORY_DAYS,
+  MAX_SUBSCRIPTIONS,
+  type ClientConfig,
+  type Health,
+} from '@gbg-osint/shared';
 import type { FastifyInstance } from 'fastify';
 import { buildBrief } from '../core/brief';
-import type { History } from '../core/history';
+import { HISTORY_KEEP_MS, HISTORY_WINDOW_MS, type History } from '../core/history';
 import { UpstreamError } from '../core/http';
 import type { Scheduler } from '../core/scheduler';
 import { spotReport } from '../core/spot';
@@ -16,6 +22,15 @@ const HISTORY_PREFIX = /^[a-z0-9]+(?:\.[a-z0-9_-]+)+\/(?:[A-Za-z0-9_.:-]{1,128}\
 const MAX_HISTORY_PREFIX = 200;
 const ITEM_ID = /^[A-Za-z0-9_.:-]{1,128}$/;
 const COORD = /^-?\d{1,3}(?:\.\d{1,7})?$/;
+const HOURS = /^\d{1,3}$/;
+const EPOCH_MS = /^\d{13}$/;
+
+/** Start of the requested window: `hours` back from now (1 hour to the whole history), 24 by default. */
+function windowStart(hours: string | undefined, now: number): number | undefined {
+  if (hours === undefined) return now - HISTORY_WINDOW_MS;
+  const h = HOURS.test(hours) ? Number(hours) : 0;
+  return h >= 1 && h <= HISTORY_DAYS * 24 ? now - h * 3600_000 : undefined;
+}
 
 export interface ApiDeps {
   store: ChannelStore;
@@ -55,23 +70,55 @@ export function registerApiRoutes(app: FastifyInstance, deps: ApiDeps): void {
     return spotReport(deps.store, x, y);
   });
 
-  app.get<{ Querystring: { prefix?: string } }>('/api/history/series', async (request, reply) => {
-    const prefix = request.query.prefix ?? '';
-    if (prefix.length > MAX_HISTORY_PREFIX || !HISTORY_PREFIX.test(prefix)) {
-      return reply.code(404).send({ error: 'Not Found' });
-    }
-    return { series: deps.history.seriesUnder(prefix) };
-  });
+  app.get<{ Querystring: { prefix?: string; hours?: string } }>(
+    '/api/history/series',
+    async (request, reply) => {
+      const prefix = request.query.prefix ?? '';
+      const from = windowStart(request.query.hours, Date.now());
+      if (prefix.length > MAX_HISTORY_PREFIX || !HISTORY_PREFIX.test(prefix) || !from) {
+        return reply.code(404).send({ error: 'Not Found' });
+      }
+      return { series: deps.history.seriesUnder(prefix, from) };
+    },
+  );
 
-  app.get<{ Params: { channel: string; id: string } }>(
+  app.get<{ Params: { channel: string; id: string }; Querystring: { hours?: string } }>(
     '/api/history/track/:channel/:id',
     async (request, reply) => {
       const { channel, id } = request.params;
-      if (!ChannelName.safeParse(channel).success || !ITEM_ID.test(id)) {
+      const from = windowStart(request.query.hours, Date.now());
+      if (!ChannelName.safeParse(channel).success || !ITEM_ID.test(id) || !from) {
         return reply.code(404).send({ error: 'Not Found' });
       }
       const key = `${channel}/${id}`;
-      return deps.history.trackOf(key) ?? { key, points: [] };
+      return deps.history.trackOf(key, from) ?? { key, points: [] };
+    },
+  );
+
+  app.get('/api/history/range', async () => deps.history.range());
+
+  app.get<{ Querystring: { t?: string; channels?: string } }>(
+    '/api/history/at',
+    async (request, reply) => {
+      const { t = '', channels = '' } = request.query;
+      const now = Date.now();
+      const at = Number(t);
+      const names = [...new Set(channels.split(','))];
+      if (
+        !EPOCH_MS.test(t) ||
+        at > now ||
+        at < now - HISTORY_KEEP_MS ||
+        names.length > MAX_SUBSCRIPTIONS ||
+        !names.every((n) => ChannelName.safeParse(n).success)
+      ) {
+        return reply.code(404).send({ error: 'Not Found' });
+      }
+      const known = names.flatMap((name) => {
+        const kind = deps.store.kindOf(name);
+        return kind ? [{ name, kind }] : [];
+      });
+      const items = deps.history.at(at, known);
+      return { t: at, channels: [...items].map(([channel, list]) => ({ channel, items: list })) };
     },
   );
 

@@ -20,6 +20,7 @@ interface TopBarProps {
   layersOpen: boolean;
   rightPanel: RightPanel | null;
   toolsOpen: boolean;
+  replaying: boolean;
   radioOn: boolean;
   searchRef: Ref<HTMLInputElement>;
   searchEntities: readonly EntityCandidate[];
@@ -32,6 +33,7 @@ interface TopBarProps {
   onToggleLayers(): void;
   onToggleRight(panel: RightPanel): void;
   onToggleTools(): void;
+  onToggleReplay(): void;
   onOpenMissions(): void;
   onOpenScenes(): void;
   onShare(): void;
@@ -98,6 +100,14 @@ export function TopBar(props: TopBarProps) {
           title="Measure, pins and routes (G)"
         >
           Tools
+        </button>
+        <button
+          type="button"
+          aria-pressed={props.replaying}
+          onClick={props.onToggleReplay}
+          title="Replay the last 7 days (P)"
+        >
+          Replay
         </button>
         <SearchBox
           inputRef={props.searchRef}
