@@ -122,7 +122,7 @@ interface Connector {
   - Moves under 3 m, and short moves backwards, are treated as GPS noise and the vehicle holds still.
   - Buses are drawn 1.6 m right of the centreline, in their lane. Trams (three sections) and trains (two cars) are articulated: each section follows the path on its own and bends through curves.
   - Vehicles more than 25–35 m from any line (or before their tiles load) keep their raw positions. A live check matched all trams and about 97–100 % of buses once tiles were cached.
-  - Västtrafik journey shapes (90–240 m between points) were too coarse for this. Trafiklab GTFS shapes would add per-line routes if a subscription is added later.
+  - Västtrafik journey shapes (90–240 m between points) were too coarse for this. Trafiklab GTFS shapes were later measured and not used for matching either (see 6.5).
 - **3D vehicle models:** low-poly glTF models are generated in the browser (no model files or downloads): trams (three sections, line-coloured signs), buses, trains, ferries, cars and twelve ship types sized from AIS length and beam. Nearby objects switch from icons to models (transit within 3 km, ships within 15 km).
 - **Animated waterways:** rivers, canals and streams from OSM draw moving streaks in the direction of flow. The streak speed is illustrative.
 - **Illustrative cars:** Trafikverket `TrafficFlow` stations are snapped to OSM roads. Cars drive along about 600 m of road around each station, with their number and speed taken from the latest measurement. The cars are not real vehicles, and the details card says so.
@@ -479,7 +479,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - ✅ **Trafiklab GTFS Regional** (`TRAFIKLAB_GTFS_REGIONAL_KEY`): the Västtrafik feed (about 100 MB zipped, 570 MB unpacked) is downloaded at most once a week; the free tier allows few downloads a month, so the processed network is cached on disk and reused across restarts. A small built-in zip reader streams `shapes.txt` and `stop_times.txt` (about 5 million lines each, about 8 s).
   - *Public transport routes:* the most common path for each line and direction within the area (about 440 lines, simplified to 4 m), in the line's own Västtrafik colour when its vehicles are on the map, else by mode; buses fainter. Shapes are split where the source has gaps over 5 km. Clicking a line shows where it goes and the operator.
   - *Stops & stations:* about 1,300 stations with the lines serving them (e.g. Brunnsparken: "Tram 1, 2, 3 … · Bus 18, 25 …"), coloured by their main mode and searchable.
-  - Not done: snapping trams to their own line's shape (they already follow OSM tracks).
+  - Dropped: snapping trams to their own line's shape. Measured on live data (about 600 tram moves), the OSM track matching leaves the tram's line on only 0.06–0.14% of the path, while about 7% of positions are 40 m to 2 km off their line's most common GTFS shape (diversions), so snapping would make those worse.
 - ✅ **Cesium ion** (`CESIUM_ION_ACCESS_TOKEN`, free, non-commercial): the `3D` button (and `terrain=1` in the link) switches on Cesium World Terrain and Cesium OSM Buildings, which replace the OpenFreeMap buildings while it is on.
   - Vehicles, ships, pins and labels sit on the real ground (heights sampled from loaded tiles, cached and refreshed as finer tiles arrive); aircraft use reported altitude plus the local geoid height (about 35 m).
   - Lines and areas (routes, waterways, districts, travel times, viewsheds, tools) are draped on the terrain, and clicks pick the terrain surface.
