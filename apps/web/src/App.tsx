@@ -93,6 +93,7 @@ const WIDE_SCREEN_QUERY = '(min-width: 900px)';
 const VISITED_KEY = 'gbg-osint:visited';
 const DENSITIES: readonly number[] = [1, 0.5, 0.25];
 const SEARCH_VIEW_HEIGHT_M = 2500;
+const ADDRESS_VIEW_HEIGHT_M = 800;
 const BRIEF_VIEW_HEIGHT_M = 3000;
 const TOAST_MS = 2500;
 const MAX_ALERTS = 30;
@@ -619,7 +620,10 @@ export function App() {
     if (r.type === 'coords') flyTo(viewOf(r.lon, r.lat, SEARCH_VIEW_HEIGHT_M));
     else if (r.type === 'place') {
       flyTo(viewOf(r.place.lon, r.place.lat, r.place.height ?? SEARCH_VIEW_HEIGHT_M));
-    } else track({ layerId: r.entity.layerId, id: r.entity.id });
+    } else if (r.type === 'address') {
+      flyTo(viewOf(r.lon, r.lat, ADDRESS_VIEW_HEIGHT_M));
+      openSpot([r.lon, r.lat]);
+    } else if (r.type === 'entity') track({ layerId: r.entity.layerId, id: r.entity.id });
   };
 
   const toggleLayer = useCallback((id: string) => {

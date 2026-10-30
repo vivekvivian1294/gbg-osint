@@ -1,6 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { PLACES } from './places';
-import { normalize, parseCoordinates, search } from './search';
+import { geocodeUrl, lookupQuery, normalize, parseCoordinates, search } from './search';
+
+describe('address lookup', () => {
+  it('encodes the query as canonical base64url, as the server expects', () => {
+    for (const text of ['Järntorget', 'Kungsportsavenyen 10', 'Åby torg?&/']) {
+      expect(geocodeUrl(text)).toBe(
+        `/api/data/photon.geocode/search/${Buffer.from(text, 'utf8').toString('base64url')}.json`,
+      );
+    }
+  });
+
+  it('only looks up sensible text', () => {
+    expect(lookupQuery('  Vasagatan   7 ')).toBe('Vasagatan 7');
+    expect(lookupQuery('ab')).toBeUndefined();
+    expect(lookupQuery('x'.repeat(61))).toBeUndefined();
+  });
+});
 
 describe('normalize', () => {
   it('folds case, accents and whitespace', () => {

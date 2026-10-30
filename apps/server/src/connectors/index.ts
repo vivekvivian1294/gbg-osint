@@ -7,6 +7,7 @@ import { celestrak } from './celestrak';
 import { elpris } from './elpris';
 import { energyChartsSweden } from './energyCharts';
 import { nasaGibs } from './gibs';
+import { photonGeocoder } from './geocoder';
 import { trafiklabGtfs } from './gtfs';
 import { goteborgAirQuality, goteborgTraffic, goteborgWaterLevels } from './goteborg';
 import { metNowcast, vivaHarbour } from './harbour';
@@ -90,4 +91,5 @@ export const connectors: readonly Connector[] = [
   bathingWaters,
   nasaGibs,
   trafiklabGtfs,
+  photonGeocoder,
 ];

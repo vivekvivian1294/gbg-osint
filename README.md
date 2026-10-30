@@ -44,7 +44,7 @@ Keys stay on your machine: the server uses them, and only the CARTO key and the 
 
 ## Using it
 
-- `?` lists the keyboard shortcuts. `Layers` turns sources on and off, `Feed` shows live events (filter by category, severity, time, what's in view or inside a watch area), `Boards` shows departures, and `Brief` (`N`) gives a "Now in Gothenburg" summary with the transit delay index.
+- `?` lists the keyboard shortcuts. `/` searches places, live objects, coordinates and street addresses (OpenStreetMap via Photon, looked up only when you ask). `Layers` turns sources on and off, `Feed` shows live events (filter by category, severity, time, what's in view or inside a watch area), `Boards` shows departures, and `Brief` (`N`) gives a "Now in Gothenburg" summary with the transit delay index.
 - Click any vehicle, ship or aircraft for details, `T` to track it and `C` to ride along. Ships, aircraft and trains show where they have been in the last 24 hours. Cards can show the nearest road camera.
 - Right-click the map (long-press on touch, or `W` for the centre) for "What's here?": nearby incidents, the nearest road camera, street-level photos, Wikipedia articles and district statistics.
 - `G` opens the tools: measure, pins, routes (with "Fly the route") and watch areas. A watch area alerts you when an incident appears inside it or a ship or train enters, while the app is open.

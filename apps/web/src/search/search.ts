@@ -10,7 +10,29 @@ export interface EntityCandidate {
 export type SearchResult =
   | { type: 'coords'; label: string; lon: number; lat: number }
   | { type: 'place'; label: string; place: Place }
-  | { type: 'entity'; label: string; entity: EntityCandidate };
+  | { type: 'entity'; label: string; entity: EntityCandidate }
+  /** Asks the address search (geocoder) for `query`. */
+  | { type: 'lookup'; label: string; query: string }
+  | { type: 'address'; label: string; detail?: string; lon: number; lat: number };
+
+export const MIN_LOOKUP = 3;
+export const MAX_LOOKUP = 60;
+
+/** The text sent to the address search, or undefined if it is too short or too long. */
+export function lookupQuery(input: string): string | undefined {
+  const q = input.normalize('NFC').replace(/\s+/g, ' ').trim();
+  return q.length >= MIN_LOOKUP && q.length <= MAX_LOOKUP ? q : undefined;
+}
+
+/** Server path for an address search; the text travels as base64url (UTF-8). */
+export function geocodeUrl(query: string): string {
+  const bytes = new TextEncoder().encode(query);
+  const b64 = btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '');
+  return `/api/data/photon.geocode/search/${b64}.json`;
+}
 
 const MAX_PLACES = 6;
 const MAX_ENTITIES = 5;

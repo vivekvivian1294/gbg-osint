@@ -43,6 +43,22 @@ export const RouteSchema = z.object({
 });
 export type Route = z.infer<typeof RouteSchema>;
 
+/** Address search results (geocoder), best match first. */
+export const GeocodeSchema = z.object({
+  results: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(200),
+        detail: z.string().max(200).optional(),
+        kind: z.string().max(40).optional(),
+        lon: z.number().min(-180).max(180),
+        lat: z.number().min(-90).max(90),
+      }),
+    )
+    .max(10),
+});
+export type Geocode = z.infer<typeof GeocodeSchema>;
+
 const Airport = z.object({
   icao: z.string().min(3).max(4),
   iata: z.string().max(3).optional(),
