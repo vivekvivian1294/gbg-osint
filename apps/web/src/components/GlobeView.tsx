@@ -33,6 +33,7 @@ import { ViewshedLayer, type ViewCamera } from '../engine/viewsheds';
 import { WaterwayLayer } from '../engine/waterways';
 import type { TrackRef } from '../layers/contacts';
 import type { DistrictShape } from '../layers/districts';
+import type { ViewBounds } from '../state/feedFilter';
 import type { Store } from '../state/store';
 
 export interface GlobeHandle {
@@ -102,6 +103,13 @@ function viewCentre(globe: CesiumWidget): LonLat | null {
   return groundAt(globe, new Cartesian2(canvas.clientWidth / 2, canvas.clientHeight / 2));
 }
 
+function viewBounds(globe: CesiumWidget): ViewBounds | null {
+  const r = globe.camera.computeViewRectangle();
+  if (!r) return null;
+  const deg = CesiumMath.toDegrees;
+  return { west: deg(r.west), south: deg(r.south), east: deg(r.east), north: deg(r.north) };
+}
+
 interface GlobeViewProps {
   ref?: Ref<GlobeHandle>;
   basemap: BasemapId;
@@ -140,6 +148,8 @@ interface GlobeViewProps {
   onCameraSettled(state: CameraState): void;
   /** The ground point at the centre of the view once the camera stops (null over the sky). */
   onCentreSettled(point: LonLat | null): void;
+  /** The visible part of the globe once the camera stops (null when none is visible). */
+  onViewSettled(view: ViewBounds | null): void;
   onPick(pick: PickRef | null): void;
   onMapClick(lon: number, lat: number): void;
   /** Right-click, or a long press on touch screens: "What's here?". */
@@ -238,6 +248,7 @@ export function GlobeView(props: GlobeViewProps) {
     };
     engineRef.current = engine;
     latest.current.onCentreSettled(viewCentre(globe));
+    latest.current.onViewSettled(viewBounds(globe));
     const refreshHeights = () => {
       renderer.refreshHeights();
       engine.tools.refreshHeights();
@@ -254,6 +265,7 @@ export function GlobeView(props: GlobeViewProps) {
       camera.moveEnd.addEventListener(() => {
         latest.current.onCameraSettled(getCameraState(globe));
         latest.current.onCentreSettled(viewCentre(globe));
+        latest.current.onViewSettled(viewBounds(globe));
         engine.viewsheds.update();
       }),
       scene.postRender.addEventListener(() => {

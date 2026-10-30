@@ -4,6 +4,7 @@ import {
   isEvent,
   pointInRing,
   type ChannelItem,
+  type GeoEvent,
   type LonLat,
 } from '@gbg-osint/shared';
 
@@ -97,13 +98,18 @@ interface Hit {
   at: LonLat;
 }
 
+/** Where a precisely placed event lies inside the ring, if it does. */
+export function eventInside(event: GeoEvent, ring: readonly LonLat[]): LonLat | undefined {
+  if (!event.geometry || !PRECISE.has(event.locationPrecision)) return undefined;
+  return geometryVertices(event.geometry).find((p) => pointInRing(p, ring));
+}
+
 /** Watchable items of a channel inside the area, by id. */
 export function itemsInside(area: WatchArea, items: readonly ChannelItem[]): Map<string, Hit> {
   const hits = new Map<string, Hit>();
   for (const item of items) {
     if (isEvent(item)) {
-      if (!item.geometry || !PRECISE.has(item.locationPrecision)) continue;
-      const at = geometryVertices(item.geometry).find((p) => pointInRing(p, area.ring));
+      const at = eventInside(item, area.ring);
       if (at) hits.set(item.id, { text: item.title, at });
     } else if (isEntity(item) && (item.kind === 'ship' || item.kind === 'train')) {
       if (item.id.startsWith('anon-')) continue;

@@ -458,7 +458,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - Weather and environment (temperature, gusts, rain nowcast, poor air quality, ice or snow on roads), and energy (spot price and renewable share).
 - ✅ **Anomaly flags:** a robust z-score (median and MAD) of the latest value against the last 24 hours, for road and city traffic incidents, police events, rail disruptions, late departures, sea level and gusts. A flag needs 3 hours of history, |z| ≥ 3.5 and a minimum absolute change, and is labelled as a statistical flag, not an alarm. River levels above their limits appear in the harbour section.
 
-**6.4 Analyst tools** (spot report, nearest camera and watch areas ✅ done; the rest open)
+**6.4 Analyst tools** (spot report, nearest camera, watch areas and feed filters ✅ done; the rest open)
 - ✅ **"What's here?" spot report:** right-click, long-press on touch screens, or `W` for the centre of the view. The card shows:
   - incidents, disruptions and warnings with a precise place within 500 m (the five nearest, with "show all"), each one clickable;
   - the nearest Trafikverket road camera within 5 km with its latest image;
@@ -473,7 +473,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - While the app is open it alerts when an incident with a precise place appears inside, or a named ship or live train enters (the first look only records what is already there; the same object is not alerted again within 30 minutes). Police events (municipality only), news and social posts are not watched, nor are anonymised leisure craft.
   - Alerts appear as a toast, in a "Recent alerts" list in the tool (click to show on the map) and, if allowed, as browser notifications.
   - The app subscribes to the watched channels in the background, without turning their layers on.
-- **Feed filters:** by category, severity, time window, "in view" and "in watch area".
+- ✅ **Feed filters:** category (with counts), minimum severity, started within the last hour, 6 or 24 hours (planned future events are left out), "in view" (any part of the event's place overlaps what the camera shows; unplaced news never matches) and "in watch areas" (the same precise-place rule as the alerts). The panel shows "N of M events" and a clear button; the list stops at the newest 200 with a note.
 - **Fly the route** *(GEV)*: turn an A→B route into a camera tour.
 - **Scene files** *(GEV)*: import and export tours as files.
 - **Export:** the selection or the view as GeoJSON or CSV, and a screenshot with credits.

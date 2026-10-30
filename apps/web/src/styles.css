@@ -386,6 +386,55 @@ select option {
   color: var(--warn);
 }
 
+.feed-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.feed-filters select {
+  width: 100%;
+  padding: 3px 6px;
+}
+
+.feed-filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.feed-filters .check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.feed-filters .check:has(input:disabled) {
+  cursor: default;
+  color: var(--muted);
+}
+
+.feed-filters input {
+  accent-color: var(--accent);
+}
+
+.feed-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+  font: 11px var(--mono);
+  color: var(--muted);
+}
+
+.feed-count button {
+  padding: 1px 8px;
+  font: 11px var(--mono);
+}
+
 /* Right panel tabs and departure boards */
 
 .panel-tabs,

@@ -78,10 +78,10 @@ import { useStreetPhotos } from './state/streetPhotos';
 import { useTools } from './state/tools';
 import { useSpot } from './state/spot';
 import { Watcher, watchChannels, type WatchAlert } from './state/watch';
+import { NO_FILTER, type FeedFilter, type ViewBounds } from './state/feedFilter';
 import { parseHash, writeHash, type UrlState } from './state/urlState';
 import { addKeyframe, loadRecording, recordedTour, saveRecording } from './tours';
 
-const MAX_FEED_ITEMS = 200;
 const WIDE_SCREEN_QUERY = '(min-width: 900px)';
 const VISITED_KEY = 'gbg-osint:visited';
 const DENSITIES: readonly number[] = [1, 0.5, 0.25];
@@ -163,6 +163,8 @@ export function App() {
   const [toast, setToast] = useState('');
   const [spot, setSpot] = useState<LonLat | null>(null);
   const [centre, setCentre] = useState<LonLat | null>(null);
+  const [view, setView] = useState<ViewBounds | null>(null);
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>(NO_FILTER);
   const spotData = useSpot(spot);
   const [watcher] = useState(() => new Watcher());
   const [alerts, setAlerts] = useState<WatchAlert[]>([]);
@@ -330,8 +332,7 @@ export function App() {
   const events = eventChannels
     .flatMap(itemsOf)
     .filter(isEvent)
-    .sort((a, b) => Date.parse(b.start) - Date.parse(a.start))
-    .slice(0, MAX_FEED_ITEMS);
+    .sort((a, b) => Date.parse(b.start) - Date.parse(a.start));
 
   const metricGroups: MetricGroup[] = activeLayers
     .filter((l) => l.channels.some((c) => channelKinds.get(c) === 'metrics'))
@@ -712,6 +713,7 @@ export function App() {
         tourStore={tourStore}
         onCameraSettled={setCamera}
         onCentreSettled={setCentre}
+        onViewSettled={setView}
         onPick={(pick) => {
           setSelection(pick);
           setSpot(null);
@@ -802,7 +804,14 @@ export function App() {
             </button>
           </div>
           {panels.right === 'feed' && (
-            <EventFeed events={events} hasEventLayers={eventChannels.length > 0} />
+            <EventFeed
+              events={events}
+              hasEventLayers={eventChannels.length > 0}
+              filter={feedFilter}
+              onFilterChange={setFeedFilter}
+              view={view}
+              watchAreas={tools.watchAreas}
+            />
           )}
           {panels.right === 'boards' && (
             <BoardsPanel
