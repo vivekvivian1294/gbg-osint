@@ -248,6 +248,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 
 ### Look and feel
 - A full-screen 3D view of Gothenburg inside an ops-room frame. The default style is **Normal** for readability. Sensor styles (CRT, NVG, FLIR, Noir) are one keypress away.
+- **Futuristic finish** (2026-10-30): glass panels with faint scanlines and corner brackets, sharp corners, glowing headings, buttons and dividers, and a slow light along the top bar (off with reduced motion). The globe, markers and data colours are unchanged, so the map stays readable.
 - **HUD (`H`):** UTC and local time, camera position and altitude, heading, active layers, number of contacts in view, and feed health.
 - **Detection overlay (`D`):** on-screen boxes and IDs around vehicles, ships and aircraft in view, with a density control.
 
@@ -552,4 +553,4 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - E-scooters: no public GBFS feed for Gothenburg was found (Voi requires authentication; Dott and Bolt publish none).
 - District boundaries: answered in Phase 5 by SCB RegSO 2025 (CC0).
 - ✅ Police events in districts (2026-10-30): a police event whose summary names exactly one Göteborg district (about 120 names and common forms like *Gamlestan* or *Nordstan*, whole words, genitive allowed, names after *mot* ignored) is placed at that district's centre (from SCB RegSO areas, else OpenStreetMap) with precision `district`. The feed, card and map label name the district and say it is approximate; such events still don't count as precise for "What's here?" or watch areas. About a quarter of recent Göteborg events are placed; the rest stay at the municipality centre.
-- Style balance: how much "spy-thriller" look versus civic readability? The current default is Normal, with sensor styles opt-in.
+- Style balance: answered with a futuristic finish on the interface (see *Look and feel*); Normal stays the default map style and the sensor styles stay opt-in.
