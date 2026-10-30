@@ -143,7 +143,6 @@ interface Connector {
 | Keyless (default) | Aerial imagery (Esri World Imagery), terrain, and self-hosted 3D buildings. **Esri World Imagery, Esri Dark Gray Canvas and OSM tiles are used; their usage terms apply to whoever runs the tool.** **Phase 4: buildings come from OpenFreeMap (OSM heights), proxied and cached by our server.** | Free. Licences need checking. |
 | Free key: CARTO (`CARTO_API_KEY`) | Dark Matter and Voyager raster basemaps | Free up to 5M tiles/month for non-commercial use. The key is sent to the browser (localhost). Without a key the options are disabled. |
 | Free key: Cesium ion | Cesium World Terrain, Cesium OSM Buildings | The Community plan is for personal, non-commercial use and has quotas. Check eligibility. |
-| Metered: Google Photorealistic 3D Tiles | Photorealistic 3D Gothenburg | Billed per browser session to the user's own key. Opt-in toggle only, with a restricted key, a daily quota cap and budget alerts. |
 
 ## 4. Data source catalogue
 
@@ -156,12 +155,12 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | --- | --- | --- | --- | --- |
 | Västtrafik API portal (developer.vasttrafik.se) – Planera Resa v4 | Live vehicle positions (bbox), departure boards, journeys | Free (OAuth2 client credentials) | poll 5–10 s | **The main source for live trams, buses and ferries.** |
 | Trafiklab GTFS Regional `vt` (static) | Stops, routes, shapes | Free (Trafiklab) | daily | Draws routes and stops. **Trafiklab has no Västtrafik GTFS-RT** (static only), so use Västtrafik's API for live data. |
-| Trafikverket Open API – `TrainAnnouncement` | Train arrivals and departures at Göteborg C | Free | poll 30 s or SSE | Station signature `G`. |
+| Trafikverket Open API – `TrainAnnouncement` | Train arrivals and departures at Göteborg C | Free | poll 30 s | Station signature `G`. |
 
 ### 4.2 Road traffic
 | Source | Data | Key | Mode | Notes |
 | --- | --- | --- | --- | --- |
-| Trafikverket Open API – `Situation` | Accidents, roadworks, closures | Free | SSE stream | Supports server-sent events with `changeid`. |
+| Trafikverket Open API – `Situation` | Accidents, roadworks, closures | Free | poll 60 s | Server-sent events with `changeid` exist; polling is enough. |
 | Trafikverket – `Camera` | Road camera snapshots | Free | poll 60 s | Göteborgs Stad's own TrafficCameras service was shut down in 2025. |
 | Trafikverket – `TrafficFlow` (`trafikverket.trafficflow`) | Flow and average speed per lane at measurement stations | Free | poll 2 min | Namespace `road.trafficinfo`, schema 1.5. Snapped to OSM road geometry (Overpass, cached 7 days) to drive the illustrative cars. |
 | Trafikverket – `WeatherMeasurepoint`, `FerryAnnouncement` | Road weather, road ferries | Free | poll | |
@@ -213,7 +212,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | --- | --- | --- | --- | --- |
 | SCB PxWebApi v2 (`scb.districts`) | Population, ages, land area, education and median income per RegSO area | None | daily (cached 7 days) | `POST /api/v2/tables/<id>/data` with a JSON selection (long GET URLs fail). Tables TAB6574, TAB6420, TAB6534 and TAB6684, latest year via `top(1)`. CC0. |
 | SCB GeoServer – RegSO 2025 boundaries | 147 named statistical areas in Gothenburg | None | with the statistics | WFS `stat:RegSO_2025`, `kommunkod='1480'`, GeoJSON in EPSG:4326, simplified to 6 m. CC0. |
-| Göteborgs Stad statistikdatabas (PxWeb) | District-level statistics | None | weekly | Not used yet; SCB covers the basics. |
 | OpenStreetMap via Overpass | Hospitals, police and fire stations, shelters, etc. | None | prefetch weekly | Prefetch only; never query from the browser. |
 | Imagery, terrain, 3D buildings | See *Basemap tiers* in §3 | Varies | static | tile.openstreetmap.org is fine for light personal use, not heavy use (OSM tile policy). |
 
@@ -236,11 +234,9 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | --- | --- | --- | --- | --- |
 | CelesTrak + satellite.js (SGP4) | Satellites over Gothenburg, next visible ISS pass | None | refresh orbital data every few hours | Cache on the server; CelesTrak asks clients not to over-poll. |
 | SMHI radar open data (`smhi.radar`) | Nordic precipitation radar composite | None | poll 5 min | GeoTIFF frames: `0` is no echo, `255` is no coverage, dBZ = 0.4·value − 30. Animated last hour (12 frames). CC BY 4.0. |
-| SMHI lightning open data | Lightning strikes | None | verify | It may only be published as daily archives; check whether near-real-time data exists. |
 | MET Norway or Open-Meteo | Wind field for an animated wind layer | None | hourly | MET Norway requires an identifying User-Agent and caching. Open-Meteo's free tier is non-commercial. |
 | Panoramax, KartaView (`streetphotos`) | Street-level photos | None | on demand | Per z15 tile, cached for a day. The server proxies images from allow-listed hosts, and each photo's licence (CC BY-SA 4.0) is shown. Panoramax has about 1,000 photos in Gothenburg; KartaView is sparse and restricts bounding-box search, so a radius search is used. |
 | OpenFreeMap (`openfreemap.buildings`) | 3D building footprints and heights (OSM) | None | on demand | Vector tiles (OpenMapTiles schema). They replaced Overpass, which was often over capacity. |
-| Mapillary | Street-level photos | Free client token | on demand | The token is public by design. |
 | Sveriges Radio open API + Radio Browser (`radio.stations`) | P1, P2, P3, P4 Göteborg and P4 Väst, plus community stations near Gothenburg | None | on demand (cached daily) | HTTPS streams only; the CSP allows `media-src https:`. Only a few community stations near Gothenburg have working HTTPS streams. |
 | OSRM via FOSSGIS (`osrm.routes`) | Walk, bike and drive routes | None | on demand | Throttled to 1 request/s and cached. FOSSGIS bike durations are implausible, so cycling time is estimated at 16 km/h. Fine for occasional personal use; heavy users should self-host OSRM (usage policy). |
 | OpenStreetMap (Overpass, prefetched) | Infrastructure: port terminals, bridges, tunnels, substations, power lines, fuel depots | None | weekly | Label as community-mapped and incomplete. |
@@ -298,7 +294,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - Apply `@fastify/helmet` (CSP), `@fastify/rate-limit`, a WebSocket connection cap per IP, and size limits on messages.
 - Use per-connector exponential backoff and a circuit breaker so one failing source can't affect the others or flood the upstream API.
 - Cap upstream response sizes. Error messages sent to clients must not include upstream URLs or keys.
-- **Keys the browser must see** (Cesium ion, Google Map Tiles, Mapillary):
+- **Keys the browser must see** (Cesium ion, CARTO):
   - Restrict each one by HTTP referrer and by API.
   - Set provider-side daily quotas and budget alerts. App-level throttles are not billing caps.
 - There is no in-app key entry; keys are set only in `.env` (or the environment).
@@ -361,9 +357,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Maritime:** aisstream.io WebSocket for ships. Pleasure craft, sailing boats and class-B vessels of unknown type are anonymised (hashed ID, no name or MMSI).
 - **Aviation:** Swedavia GOT arrivals and departures. A flight can be tracked when its callsign matches a live aircraft.
 - **UI:** a Boards panel (`B`) with transit hubs, Göteborg C and Landvetter, tabbed with the feed. CARTO Dark Matter and Voyager basemaps are available when `CARTO_API_KEY` is set.
-- **Not done yet:**
-  - GTFS static routes and stops (Trafiklab; the quota is 50 requests/month, so cache the file).
-  - Trafikverket SSE (polling is used instead), road ferries, and parking.
+- **Added later or skipped:** GTFS routes and stops (6.5) and road ferries (6.1) were added. Trafikverket SSE was skipped (polling works), and there is no open parking occupancy data (6.6).
 - **Findings:**
   - Trafikverket `Situation` needs namespace `road.trafficinfo` and schema version 1.6.
   - Trafikverket's WGS84 `center`/`radius` filter fails, so a `box` filter is used instead.
@@ -384,7 +378,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Scene director (`S`, Scenes button):**
   - Four tours: *Göta älv from the sea*, *Inner city orbit*, *Port of Gothenburg* and *Final approach, Landvetter*.
   - Record your own tour from views you add.
-- **Not done (needs keys or costs money):** Google Photorealistic 3D (metered per visitor) and Mapillary (token). They stay optional for later. Cesium ion terrain and buildings were added in 6.5.
+- **Skipped:** Google Photorealistic 3D (metered per visitor) and Mapillary (token). Cesium ion terrain and buildings were added in 6.5.
 - **Findings:**
   - Overpass was over capacity (502) for building queries, so OpenFreeMap is the building source.
   - Basemap changes now replace only the base imagery layer, so overlays such as radar survive.
@@ -404,13 +398,13 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - Measure distance and area.
   - Pins, kept in the browser.
   - A→B routes on foot, by bike or by car, via OSRM.
-- **Not done:** the Göteborgs Stad statistics database and primärområden. SCB RegSO areas cover the choropleth with open, CC0 boundaries.
+- **Skipped:** the Göteborgs Stad statistics database and primärområden. SCB RegSO areas cover the choropleth with open, CC0 boundaries.
 
 ### Street-aligned vehicles ✅ done (before Phase 6)
 - Trams, buses and trains are map-matched to OSM tracks and streets and play back along the route they took. Trams and trains bend through curves, and buses keep to their lane. See "Rendering engine".
 - ✅ **Tunnels** (2026-10-30): an `osm.tunnels` source (Overpass, weekly) publishes road and rail tunnels and covered roads (about 410 ways: Götatunneln, Gnistängstunneln, Marieholmstunneln, Tingstadstunneln, Lundbytunneln, Gårdatunneln …). The web builds one mask from them: illustrative cars vanish inside tunnels and fade at the portals; travel-time and transit lines show their tunnel stretches as faint dashes instead of across buildings; buses, trams and trains in a tunnel stay icons instead of 3D models. A line counts as in a tunnel when it runs along one (within 5–12 m and 25°), so streets crossing above aren't hidden.
 
-### Phase 6 – More useful: sources, derived intelligence and analyst tools (next)
+### Phase 6 – More useful: sources, derived intelligence and analyst tools ✅ done
 
 **Goal:** deepen the live picture of Gothenburg and add tools that help answer questions.
 - Sources marked ✓ were checked on 2026-10-28.
@@ -492,11 +486,11 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - ✅ **Road traffic noise** (Miljöförvaltningen WMS, CC0): the city's 2023 calculation of the 24-hour average (LAeq) as an overlay with a legend. The server turns it into 256 px Web Mercator tiles (zoom 10–17, municipality only) and caches them in memory.
   - Not used: Kalendarium (403), the resurfacing plan (CC BY-NC-ND) and BridgeService v1.0 (gone; Hisingsbron is only on the APIM portal).
 - **Parking:** no open occupancy data. ParkingService v2.3 has places and rules only, and Trafikverket `Parking` lists rest areas.
-- **SMHI lightning:** the real-time service is paid, and MET Norway's lightning API is gone. MET Norway's Frost API has Nordic lightning with a free client ID; not built for now.
+- **SMHI lightning:** the real-time service is paid, and MET Norway's lightning API is gone. MET Norway's Frost API has Nordic lightning with a free client ID; skipped.
 - **Sea-level forecast and storm surge:** SMHI's old forecast host no longer exists and its NEMO-Nordic sea-level forecast is now a paid service. SMHI warnings already cover high sea levels. Instead:
   - ✅ **Sea forecast** (MET Norway oceanforecast 2.0, keyless, CC BY 4.0): significant wave height off Vinga now and the highest in the next 24 hours (with when), and the sea temperature, every 30 minutes. Part of the *Harbour watch* and *Storm watch* missions.
 - **Power outages:** Göteborg Energi's outage map uses an internal website endpoint without an open licence. Ruled out.
-- **LFV drone (UAS) zones:** found at `daim.lfv.se/geoserver/wfs` (GeoJSON, CC BY 4.0, not for operational use): the Landvetter control zone, restricted and danger areas, temporary areas from AIP SUP, NOTAM restrictions, and 1 km helipad and 5 km runway zones. Not built for now.
+- **LFV drone (UAS) zones:** found at `daim.lfv.se/geoserver/wfs` (GeoJSON, CC BY 4.0, not for operational use): the Landvetter control zone, restricted and danger areas, temporary areas from AIP SUP, NOTAM restrictions, and 1 km helipad and 5 km runway zones. Skipped.
 - **OSM-mapped surveillance cameras:** not built, to keep the no-people-tracking line simple.
 - **Ruled out earlier:**
   - E-scooter feeds: Voi needs authentication, and Dott and Bolt publish no Gothenburg feed.
@@ -545,8 +539,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 | Swedavia API portal | GOT flights | 3 |
 | CARTO (optional) | Dark Matter and Voyager basemaps | 3 |
 | Cesium ion (optional) | World terrain, OSM Buildings | 4 |
-| Google Map Tiles API (optional, metered) | Photorealistic 3D | 4 |
-| Mapillary (optional) | Street-level photos | 4 |
 | ENTSO-E (optional) | Energy mix (not needed: Energy-Charts covers it) | 5 |
 | OpenAI or Gemini (optional, metered) | Voice agent | 9 |
 
@@ -554,7 +546,6 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 
 - Port of Gothenburg and Sjöfartsverket: ViVa has open station data (✓, Phase 6); there is still no open API for port calls.
 - E-scooters: no public GBFS feed for Gothenburg was found (Voi requires authentication; Dott and Bolt publish none).
-- District boundaries: answered in Phase 5 by SCB RegSO 2025 (CC0). Göteborgs Stad primärområden remain an option for city-specific statistics.
+- District boundaries: answered in Phase 5 by SCB RegSO 2025 (CC0).
 - Should we geocode the district names that appear in police event text? Doing so would improve precision but risks implying an exact location; if done, label it clearly as approximate.
-- Better 3D basemap: self-hosted buildings (current), Cesium ion (personal-use key) or Google 3D (metered, per user key)?
 - Style balance: how much "spy-thriller" look versus civic readability? The current default is Normal, with sensor styles opt-in.
