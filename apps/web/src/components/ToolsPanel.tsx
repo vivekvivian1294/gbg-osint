@@ -22,7 +22,7 @@ const PROFILES: readonly [RouteProfile, string][] = [
 ];
 
 /** Measure, pin, route and watch tools; while one is active, map clicks place points. */
-export function ToolsPanel({ tools, watch, onClose }: ToolsPanelProps) {
+export function ToolsPanel({ tools, watch, onFlyRoute, onClose }: ToolsPanelProps) {
   const { mode, measure, pins, routeEnds, route } = tools;
   return (
     <section className="tools-panel" aria-label="Map tools">
@@ -100,13 +100,20 @@ export function ToolsPanel({ tools, watch, onClose }: ToolsPanelProps) {
               {formatDuration(route.result.durationS)}
             </p>
           )}
-          <button
-            type="button"
-            onClick={() => tools.clear('route')}
-            disabled={routeEnds.length === 0}
-          >
-            Clear
-          </button>
+          <div className="selection-actions">
+            {route.result && (
+              <button type="button" onClick={onFlyRoute}>
+                Fly the route
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => tools.clear('route')}
+              disabled={routeEnds.length === 0}
+            >
+              Clear
+            </button>
+          </div>
           <p className="muted small">
             Routing: OSRM via FOSSGIS · © OpenStreetMap contributors. Cycling time assumes 16 km/h.
           </p>
@@ -132,6 +139,8 @@ export interface WatchControls {
 interface ToolsPanelProps {
   tools: ToolsApi;
   watch: WatchControls;
+  /** Plays the current route as a camera tour. */
+  onFlyRoute(): void;
   onClose(): void;
 }
 

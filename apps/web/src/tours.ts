@@ -1,5 +1,7 @@
+import type { LonLat } from '@gbg-osint/shared';
 import { orbit, type Tour, type TourKeyframe } from './engine/tours';
 import type { CameraState } from './engine/cameraState';
+import { headingOf, LocalFrame, pointAlong, toPath } from './engine/path';
 
 const cam = (
   lon: number,
@@ -105,5 +107,75 @@ export function recordedTour(frames: readonly TourKeyframe[]): Tour {
     title: 'Your tour',
     summary: `${frames.length} recorded views`,
     keyframes: frames,
+  };
+}
+
+export const ROUTE_TOUR_ID = 'route';
+/** Flight time per km of route, bounded so short walks and long drives both stay watchable. */
+const ROUTE_S_PER_KM = 6;
+const ROUTE_MIN_S = 20;
+const ROUTE_MAX_S = 90;
+const ROUTE_KEYFRAME_S = 2;
+const ROUTE_PITCH = -35;
+const ARRIVAL_PITCH = -60;
+const LEAD_IN_S = 3;
+const ARRIVAL_S = 4;
+const MIN_ROUTE_M = 50;
+
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const RAD = Math.PI / 180;
+
+/**
+ * A chase view along a route: from the current camera down behind A, along the route looking
+ * ahead, then up over B. Null when the route is too short to fly.
+ */
+export function routeTour(
+  coords: readonly LonLat[],
+  from: CameraState,
+  title: string,
+): Tour | null {
+  if (coords.length < 2) return null;
+  const frame = new LocalFrame(coords[0]![0], coords[0]![1]);
+  const path = toPath(coords.map(([lon, lat]) => frame.toXY(lon, lat)));
+  const length = path.at(-1)!.d;
+  if (length < MIN_ROUTE_M) return null;
+
+  const flight = clamp((length / 1000) * ROUTE_S_PER_KM, ROUTE_MIN_S, ROUTE_MAX_S);
+  const height = clamp(length / 15, 300, 1200);
+  const steps = Math.max(2, Math.round(flight / ROUTE_KEYFRAME_S));
+  const lookAhead = Math.max((1.5 * length) / steps, 150);
+  // Look at a point on the route from behind and above it.
+  const view = (x: number, y: number, heading: number, h: number, pitch: number): CameraState => {
+    const back = h / Math.tan(-pitch * RAD);
+    const [lon, lat] = frame.toLonLat(
+      x - back * Math.sin(heading * RAD),
+      y - back * Math.cos(heading * RAD),
+    );
+    return { lon, lat, height: h, heading, pitch };
+  };
+
+  const keyframes: TourKeyframe[] = [{ at: 0, camera: from }];
+  let heading = 0;
+  let end = { x: 0, y: 0 };
+  for (let k = 0; k <= steps; k++) {
+    const d = (length * k) / steps;
+    const p = pointAlong(path, d);
+    const ahead = pointAlong(path, Math.min(d + lookAhead, length));
+    heading = headingOf(ahead.x - p.x, ahead.y - p.y) ?? heading;
+    end = p;
+    keyframes.push({
+      at: LEAD_IN_S + (flight * k) / steps,
+      camera: view(p.x, p.y, heading, height, ROUTE_PITCH),
+    });
+  }
+  keyframes.push({
+    at: LEAD_IN_S + flight + ARRIVAL_S,
+    camera: view(end.x, end.y, heading, height * 2, ARRIVAL_PITCH),
+  });
+  return {
+    id: ROUTE_TOUR_ID,
+    title,
+    summary: 'Following the route from A to B',
+    keyframes,
   };
 }

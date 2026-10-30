@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseHash, serializeHash } from '../state/urlState';
 import { photoTilesFor } from '../state/streetPhotos';
-import { addKeyframe, recordedTour, TOURS } from '../tours';
+import { addKeyframe, recordedTour, routeTour, TOURS } from '../tours';
 import { buildingColor } from './buildings';
 import { lonLatOfTile, tileOf, tilesAround } from './tiles';
 import { orbit, sampleTour, tourDuration, TourPlayer, type TourKeyframe } from './tours';
@@ -69,6 +69,18 @@ describe('camera tours', () => {
     expect(step2).toBeGreaterThan(step1);
   });
 
+  it('never dips below a low point, such as after diving onto a route', () => {
+    const dive: TourKeyframe[] = [
+      { at: 0, camera: view(11.9, 57.7, 5000) },
+      { at: 3, camera: view(11.91, 57.7, 300) },
+      { at: 5, camera: view(11.92, 57.7, 300) },
+      { at: 7, camera: view(11.93, 57.7, 600) },
+    ];
+    for (let t = 0; t <= 7; t += 0.1) {
+      expect(sampleTour(dive, t).height).toBeGreaterThanOrEqual(300 - 1e-9);
+    }
+  });
+
   it('builds orbits that close the circle and look at the centre', () => {
     const keyframes = orbit(11.9667, 57.7071, 700, 380, 80, 8);
     expect(keyframes).toHaveLength(9);
@@ -106,6 +118,43 @@ describe('camera tours', () => {
     expect(rec.map((k) => k.at).slice(0, 3)).toEqual([0, 8, 16]);
     expect(rec[0]!.camera.lon).toBeCloseTo(11.905, 9);
     expect(recordedTour(rec)).toMatchObject({ id: 'recorded', keyframes: rec });
+  });
+
+  it('flies a route from the current view, chasing it eastwards and rising over B', () => {
+    const from = view(11.9, 57.6, 5000);
+    // About 3 km due east.
+    const east: [number, number][] = [
+      [11.95, 57.7],
+      [11.975, 57.7],
+      [12.0, 57.7],
+    ];
+    const tour = routeTour(east, from, 'Drive')!;
+    const frames = tour.keyframes;
+    expect(frames[0]!.camera).toEqual(from);
+    const times = frames.map((k) => k.at);
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+    expect(tourDuration(tour)).toBe(3 + 20 + 4);
+    const chase = frames.slice(1, -1);
+    for (const f of chase) {
+      expect(f.camera.heading).toBeCloseTo(90, 0);
+      expect(f.camera.pitch).toBe(-35);
+    }
+    // Behind A (to the west), looking at it.
+    expect(chase[0]!.camera.lon).toBeLessThan(11.95);
+    expect(chase[0]!.camera.lat).toBeCloseTo(57.7, 6);
+    const arrival = frames.at(-1)!.camera;
+    expect(arrival.height).toBe(2 * chase[0]!.camera.height);
+    expect(arrival.pitch).toBe(-60);
+    expect(
+      routeTour(
+        [
+          [11.95, 57.7],
+          [11.9501, 57.7],
+        ],
+        from,
+        'Walk',
+      ),
+    ).toBeNull();
   });
 });
 

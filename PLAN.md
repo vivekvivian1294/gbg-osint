@@ -458,7 +458,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - Weather and environment (temperature, gusts, rain nowcast, poor air quality, ice or snow on roads), and energy (spot price and renewable share).
 - ✅ **Anomaly flags:** a robust z-score (median and MAD) of the latest value against the last 24 hours, for road and city traffic incidents, police events, rail disruptions, late departures, sea level and gusts. A flag needs 3 hours of history, |z| ≥ 3.5 and a minimum absolute change, and is labelled as a statistical flag, not an alarm. River levels above their limits appear in the harbour section.
 
-**6.4 Analyst tools** (spot report, nearest camera, watch areas and feed filters ✅ done; the rest open)
+**6.4 Analyst tools** (spot report, nearest camera, watch areas, feed filters and fly the route ✅ done; the rest open)
 - ✅ **"What's here?" spot report:** right-click, long-press on touch screens, or `W` for the centre of the view. The card shows:
   - incidents, disruptions and warnings with a precise place within 500 m (the five nearest, with "show all"), each one clickable;
   - the nearest Trafikverket road camera within 5 km with its latest image;
@@ -474,7 +474,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
   - Alerts appear as a toast, in a "Recent alerts" list in the tool (click to show on the map) and, if allowed, as browser notifications.
   - The app subscribes to the watched channels in the background, without turning their layers on.
 - ✅ **Feed filters:** category (with counts), minimum severity, started within the last hour, 6 or 24 hours (planned future events are left out), "in view" (any part of the event's place overlaps what the camera shows; unplaced news never matches) and "in watch areas" (the same precise-place rule as the alerts). The panel shows "N of M events" and a clear button; the list stops at the newest 200 with a note.
-- **Fly the route** *(GEV)*: turn an A→B route into a camera tour.
+- ✅ **Fly the route** *(GEV)*: "Fly the route" in the route tool turns the A→B route into a camera tour: from the current view down behind A in about 3 s, a chase view along the route looking ahead (6 s per km, 20–90 s; 300–1,200 m up, pitched −35°), then up over B. Tours now ease flat at their highest and lowest keyframes, so the camera never dips below a low pass.
 - **Scene files** *(GEV)*: import and export tours as files.
 - **Export:** the selection or the view as GeoJSON or CSV, and a screenshot with credits.
 - **Address search:** Photon or Nominatim through the server, cached and limited to 1 request/s, after bundled places and coordinates.

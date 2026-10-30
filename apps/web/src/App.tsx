@@ -59,6 +59,7 @@ import {
 } from './layers/contacts';
 import { buildMarkers, lineKey } from './layers/markers';
 import { classifyDistricts, DEFAULT_DISTRICT_METRIC } from './layers/districts';
+import { formatDistance } from './layers/measure';
 import { buildWindField, compass, windAt } from './layers/wind';
 import {
   DEFAULT_LAYERS,
@@ -80,7 +81,9 @@ import { useSpot } from './state/spot';
 import { Watcher, watchChannels, type WatchAlert } from './state/watch';
 import { NO_FILTER, type FeedFilter, type ViewBounds } from './state/feedFilter';
 import { parseHash, writeHash, type UrlState } from './state/urlState';
-import { addKeyframe, loadRecording, recordedTour, saveRecording } from './tours';
+import { addKeyframe, loadRecording, recordedTour, routeTour, saveRecording } from './tours';
+
+const ROUTE_TOUR_TITLES = { foot: 'Walk', bike: 'Bike ride', car: 'Drive' } as const;
 
 const WIDE_SCREEN_QUERY = '(min-width: 900px)';
 const VISITED_KEY = 'gbg-osint:visited';
@@ -846,6 +849,18 @@ export function App() {
             onEnableNotifications: enableNotifications,
             onShowAlert: (a) =>
               showTarget({ channel: a.channel, ids: [a.itemId], lon: a.lon, lat: a.lat }),
+          }}
+          onFlyRoute={() => {
+            const result = tools.route.result;
+            const tour =
+              result &&
+              routeTour(
+                tools.drawing.routeLine,
+                cameraStore.get(),
+                `${ROUTE_TOUR_TITLES[result.profile]} · ${formatDistance(result.distanceM)}`,
+              );
+            if (tour) playTour(tour);
+            else showToast('The route is too short to fly');
           }}
           onClose={() => {
             tools.setMode(null);

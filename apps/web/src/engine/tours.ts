@@ -66,6 +66,10 @@ export function sampleTour(frames: readonly TourKeyframe[], t: number): CameraSt
   const u = span > 0 ? (t - t0) / span : 1;
   const tangent = (k: number, key: (typeof KEYS)[number]) => {
     if (k <= 0 || k >= frames.length - 1) return 0;
+    const before = value(k, key) - value(k - 1, key);
+    const after = value(k + 1, key) - value(k, key);
+    // Flat at a peak or dip, so the curve never overshoots it (e.g. diving below a low pass).
+    if (before * after <= 0) return 0;
     const dt = frames[k + 1]!.at - frames[k - 1]!.at;
     return dt > 0 ? ((value(k + 1, key) - value(k - 1, key)) / dt) * span : 0;
   };
