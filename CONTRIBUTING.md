@@ -30,6 +30,8 @@ npm run format:check && npm run lint && npm run typecheck && npm test && npm run
 
 [PLAN.md](PLAN.md) has the architecture, the source catalogue and the roadmap.
 
+Phase 9, an optional voice and AI analyst (each user brings their own AI key), is left for the community to build. Open an issue to discuss the design before you start.
+
 ## Adding a data source
 
 ### 1. Check the source

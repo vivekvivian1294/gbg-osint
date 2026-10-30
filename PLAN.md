@@ -12,6 +12,7 @@ An open-source research tool: a live-updating 3D dashboard that combines open da
 | Audience | Research tool. Public GitHub repo (MIT); each user runs it locally (`npm start` or `docker compose up`) with their own optional keys. No hosted site or domain. |
 | Data retention | Live only at first; history added in a later phase |
 | Paid services | None for now. Only free and keyless sources and tile services. |
+| Not used | Lantmäteriet aerial imagery and elevation data, and Göteborgs Stad's 3D city model. |
 | Package manager | npm workspaces (ships with Node; no extra tooling) |
 | Domains | Transit, road traffic, police/crisis, weather/environment, maritime, aviation, mobility, demographics, news/social, energy |
 
@@ -139,7 +140,7 @@ interface Connector {
 ### Basemap tiers
 | Tier | What it gives | Cost and terms |
 | --- | --- | --- |
-| Keyless (default) | Open aerial imagery (candidates: Lantmäteriet open data, or Esri World Imagery), terrain, and self-hosted 3D buildings. **Esri World Imagery, Esri Dark Gray Canvas and OSM tiles are used; their usage terms apply to whoever runs the tool.** **Phase 4: buildings come from OpenFreeMap (OSM heights), proxied and cached by our server.** Göteborgs Stad's 3D city model is a later option. | Free. Licences need checking. |
+| Keyless (default) | Aerial imagery (Esri World Imagery), terrain, and self-hosted 3D buildings. **Esri World Imagery, Esri Dark Gray Canvas and OSM tiles are used; their usage terms apply to whoever runs the tool.** **Phase 4: buildings come from OpenFreeMap (OSM heights), proxied and cached by our server.** | Free. Licences need checking. |
 | Free key: CARTO (`CARTO_API_KEY`) | Dark Matter and Voyager raster basemaps | Free up to 5M tiles/month for non-commercial use. The key is sent to the browser (localhost). Without a key the options are disabled. |
 | Free key: Cesium ion | Cesium World Terrain, Cesium OSM Buildings | The Community plan is for personal, non-commercial use and has quotas. Check eligibility. |
 | Metered: Google Photorealistic 3D Tiles | Photorealistic 3D Gothenburg | Billed per browser session to the user's own key. Opt-in toggle only, with a restricted key, a daily quota cap and budget alerts. |
@@ -525,7 +526,8 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - ✅ README screenshots (`docs/images/`, captured with headless Chrome on the GPU) and `CONTRIBUTING.md` explaining how to add a data source end to end.
 - Dropped: CDN and VPS hosting, a domain, uptime monitoring, WebSocket load tests and self-hosted OSRM.
 
-### Phase 9 – Optional: voice and AI analyst
+### Phase 9 – Optional: voice and AI analyst (open to the community)
+- Not planned by the maintainer: left for the community to build. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - A realtime voice agent with tools such as "fly to", "toggle layer", "track" and "count/filter" (for example, *"How many trams are delayed right now?"*).
 - The server issues short-lived session tokens, with per-IP throttles and a hard spending cap. Each user brings their own AI key.
 - Optional MCP server exposing the same tools.
@@ -555,6 +557,4 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - District boundaries: answered in Phase 5 by SCB RegSO 2025 (CC0). Göteborgs Stad primärområden remain an option for city-specific statistics.
 - Should we geocode the district names that appear in police event text? Doing so would improve precision but risks implying an exact location; if done, label it clearly as approximate.
 - Better 3D basemap: self-hosted buildings (current), Cesium ion (personal-use key) or Google 3D (metered, per user key)?
-- Licences for Lantmäteriet aerial imagery and elevation data and for Göteborgs Stad's 3D city model.
 - Style balance: how much "spy-thriller" look versus civic readability? The current default is Normal, with sensor styles opt-in.
-- Voice agent: worth adding to a local research tool, with each user's own AI key?
