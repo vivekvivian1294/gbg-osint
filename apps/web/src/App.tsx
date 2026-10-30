@@ -53,6 +53,7 @@ import type { PickRef } from './engine/markerSpec';
 import type { OverlayStats } from './engine/overlay';
 import type { RadarState } from './engine/radar';
 import type { Tour, TourKeyframe, TourState } from './engine/tours';
+import { TUNNEL_CHANNEL, TunnelMask } from './engine/tunnels';
 import {
   buildRoster,
   distanceKm,
@@ -273,8 +274,14 @@ export function App() {
     [watching, channelKinds],
   );
   const subscribed = useMemo(
-    () => [...new Set([...liveChannels, ...watchList])],
-    [liveChannels, watchList],
+    () => [
+      ...new Set([
+        ...liveChannels,
+        ...watchList,
+        ...(channelKinds.has(TUNNEL_CHANNEL) ? [TUNNEL_CHANNEL] : []),
+      ]),
+    ],
+    [liveChannels, watchList, channelKinds],
   );
 
   useEffect(() => {
@@ -362,6 +369,11 @@ export function App() {
     }
   }
   const replayWind = replayData?.items.get('env.wind');
+  const tunnelsVersion = live.version(TUNNEL_CHANNEL);
+  const tunnels = useMemo(
+    () => new TunnelMask(tunnelsVersion > 0 ? live.items(TUNNEL_CHANNEL).filter(isFeature) : []),
+    [live, tunnelsVersion],
+  );
   const wind = useMemo(
     () =>
       windVersion < 0
@@ -836,6 +848,7 @@ export function App() {
         wind={wind}
         satellite={isActive('satellite')}
         noise={isActive('noise')}
+        tunnels={tunnels}
         terrain={terrain}
         radar={radarFrames}
         buildings={isActive('buildings')}

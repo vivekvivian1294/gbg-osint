@@ -413,6 +413,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 
 ### Street-aligned vehicles ✅ done (before Phase 6)
 - Trams, buses and trains are map-matched to OSM tracks and streets and play back along the route they took. Trams and trains bend through curves, and buses keep to their lane. See "Rendering engine".
+- ✅ **Tunnels** (2026-10-30): an `osm.tunnels` source (Overpass, weekly) publishes road and rail tunnels and covered roads (about 410 ways: Götatunneln, Gnistängstunneln, Marieholmstunneln, Tingstadstunneln, Lundbytunneln, Gårdatunneln …). The web builds one mask from them: illustrative cars vanish inside tunnels and fade at the portals; travel-time and transit lines show their tunnel stretches as faint dashes instead of across buildings; buses, trams and trains in a tunnel stay icons instead of 3D models. A line counts as in a tunnel when it runs along one (within 5–12 m and 25°), so streets crossing above aren't hidden.
 
 ### Phase 6 – More useful: sources, derived intelligence and analyst tools (next)
 

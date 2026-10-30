@@ -18,7 +18,8 @@ import { isPickRef, type MarkerSpec, type PickRef } from './markerSpec';
 import { ModelLayer, type ModelInstance } from './modelLayer';
 import { Playback } from './playback';
 import type { Ground } from './terrain';
-import { ARTICULATION } from './vehicleModels';
+import { NO_TUNNELS, type TunnelMask } from './tunnels';
+import { ARTICULATION, type ModelKind } from './vehicleModels';
 
 interface Position {
   lon: number;
@@ -38,7 +39,22 @@ interface Track {
   playback: Playback | undefined;
   /** Heading currently drawn (smoothed for played-back tracks). */
   heading: number | undefined;
+  /** Where the marker is drawn now. */
+  at: Position;
 }
+
+/** Vehicles that use roads and rails, and so can be in a tunnel. */
+const GROUND_MODELS: ReadonlySet<ModelKind> = new Set([
+  'tram',
+  'tram-cab',
+  'tram-mid',
+  'bus',
+  'train',
+  'train-car',
+  'car',
+]);
+/** Matched vehicles sit on the OpenStreetMap lines; others can be a few metres off. */
+const TUNNEL_TOLERANCE_M = 8;
 
 const STALE_ALPHA = 0.35;
 const SCALE_BY_DISTANCE = new NearFarScalar(2_000, 1.0, 3_000_000, 0.45);
@@ -76,6 +92,7 @@ export class MarkerRenderer {
   private readonly models: ModelLayer;
   private readonly tracks = new Map<string, Track>();
   private readonly scratch = new Cartesian3();
+  private tunnels: TunnelMask = NO_TUNNELS;
 
   constructor(
     private readonly scene: Scene,
@@ -98,6 +115,15 @@ export class MarkerRenderer {
 
   private height(pos: Position): number {
     return this.ground ? this.ground.heightOf(pos.lon, pos.lat, pos.alt) : pos.alt;
+  }
+
+  /** Roads and rails underground; vehicles on them are drawn as icons, not as 3D models. */
+  setTunnels(mask: TunnelMask): void {
+    this.tunnels = mask;
+  }
+
+  private underground(kind: ModelKind, lon: number, lat: number, heading?: number): boolean {
+    return GROUND_MODELS.has(kind) && this.tunnels.covers(lon, lat, heading, TUNNEL_TOLERANCE_M);
   }
 
   sync(specs: readonly MarkerSpec[], now = performance.now(), wallNow = Date.now()): void {
@@ -222,7 +248,7 @@ export class MarkerRenderer {
         // Each section follows the path on its own, so the vehicle bends through curves.
         sections.forEach((section, i) => {
           const pose = track.playback!.sectionPose(section.offset, section.half);
-          if (!pose) return;
+          if (!pose || this.underground(section.kind, pose.lon, pose.lat, pose.heading)) return;
           const sectionKey = `${key}#${i}`;
           owners.set(sectionKey, key);
           instances.push({
@@ -239,6 +265,7 @@ export class MarkerRenderer {
         });
         continue;
       }
+      if (this.underground(model.kind, track.at.lon, track.at.lat, track.heading)) continue;
       owners.set(key, key);
       instances.push({
         key,
@@ -292,6 +319,7 @@ export class MarkerRenderer {
       stale: isStale(spec, wallNow),
       playback,
       heading: spec.heading,
+      at: pos,
     };
     this.applyHeading(track);
     this.applyColor(track);
@@ -350,6 +378,7 @@ export class MarkerRenderer {
       this.scratch,
     );
     track.billboard.position = cartesian;
+    track.at = pos;
     if (track.label) track.label.position = cartesian;
   }
 

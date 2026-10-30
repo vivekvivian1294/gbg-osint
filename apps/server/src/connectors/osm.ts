@@ -129,7 +129,7 @@ const WATERWAY_QUERY =
 const SIMPLIFY_M = 4;
 const MIN_LENGTH_M = 60;
 
-const WaterwayWay = z.object({
+const OsmWay = z.object({
   type: z.literal('way'),
   id: z.number().int(),
   tags: z.record(z.string(), z.string()).default({}),
@@ -185,7 +185,7 @@ function joinChains(chains: Chain[]): Chain[] {
 export function parseWaterways(raw: unknown, fetchedAt: number): Feature[] {
   const chains: Chain[] = [];
   for (const item of Response.parse(raw).elements) {
-    const parsed = WaterwayWay.safeParse(item);
+    const parsed = OsmWay.safeParse(item);
     if (!parsed.success) continue;
     const { id, tags, geometry } = parsed.data;
     const cls = tags.waterway;
@@ -228,5 +228,65 @@ export const osmWaterways: PollConnector = {
   async poll(ctx) {
     const cached = await cachedOverpass(ctx, 'waterways', WATERWAY_QUERY, MAX_AGE_MS);
     ctx.publish.replace(WATERWAYS, parseWaterways(cached.value, cached.savedAt));
+  },
+};
+
+// --- Tunnels and covered roads, so nothing is drawn driving through buildings or hills ---
+
+const TUNNELS = 'context.tunnels';
+const ROAD_TYPES =
+  'motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|busway|' +
+  'motorway_link|trunk_link|primary_link|secondary_link|tertiary_link';
+const RAIL_TYPES = 'rail|tram|light_rail|subway';
+const TUNNEL_QUERY =
+  `[out:json][timeout:90];(` +
+  `way["highway"~"^(${ROAD_TYPES})$"]["tunnel"]["tunnel"!="no"](${BBOX});` +
+  `way["highway"~"^(${ROAD_TYPES})$"]["covered"="yes"](${BBOX});` +
+  `way["railway"~"^(${RAIL_TYPES})$"]["tunnel"]["tunnel"!="no"](${BBOX});` +
+  `);out tags geom qt;`;
+
+/** Road and rail ways that run underground, through a building or under a roof. */
+export function parseTunnels(raw: unknown, fetchedAt: number): Feature[] {
+  const ts = new Date(fetchedAt).toISOString();
+  const features: Feature[] = [];
+  for (const item of Response.parse(raw).elements) {
+    const parsed = OsmWay.safeParse(item);
+    if (!parsed.success) continue;
+    const { id, tags, geometry } = parsed.data;
+    const underground = (tags.tunnel && tags.tunnel !== 'no') || tags.covered === 'yes';
+    const mode = tags.railway ? 'rail' : tags.highway ? 'road' : undefined;
+    if (!underground || !mode) continue;
+    const name = tags.tunnel_name ?? tags['tunnel:name'] ?? tags.name;
+    features.push({
+      id: `way/${id}`,
+      source: 'osm',
+      kind: 'tunnel',
+      line: encodeLine(
+        simplifyLine(
+          geometry.map((p): LonLat => [p.lon, p.lat]),
+          0.5,
+        ),
+      ),
+      ...(name && { label: truncate(name, 200) }),
+      ts,
+      props: { mode },
+    });
+  }
+  return features;
+}
+
+export const osmTunnels: PollConnector = {
+  id: 'osm.tunnels',
+  name: 'OpenStreetMap – tunnels',
+  licence: 'ODbL 1.0',
+  attribution: '© OpenStreetMap contributors',
+  homepage: 'https://www.openstreetmap.org/copyright',
+  mode: 'poll',
+  intervalMs: 24 * 3600_000,
+  allowedHosts: OVERPASS_HOSTS,
+  channels: [{ name: TUNNELS, kind: 'features' }],
+  async poll(ctx) {
+    const cached = await cachedOverpass(ctx, 'tunnels', TUNNEL_QUERY, MAX_AGE_MS);
+    ctx.publish.replace(TUNNELS, parseTunnels(cached.value, cached.savedAt));
   },
 };

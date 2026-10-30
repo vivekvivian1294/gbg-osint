@@ -117,7 +117,13 @@ export const DepartureSchema = z.object({
 });
 export type Departure = z.infer<typeof DepartureSchema>;
 
-export const FeatureKind = z.enum(['waterway', 'traffic', 'travel-time', 'transit-route']);
+export const FeatureKind = z.enum([
+  'waterway',
+  'traffic',
+  'travel-time',
+  'transit-route',
+  'tunnel',
+]);
 export type FeatureKind = z.infer<typeof FeatureKind>;
 
 /** A map line (river, measured road stretch) that changes rarely compared with entities. */

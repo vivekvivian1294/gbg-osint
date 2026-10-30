@@ -3,8 +3,12 @@ import { Color, Material, type GroundPolylinePrimitive, type Scene } from 'cesiu
 import { building, drapedMaterialLines, type DrapedLine } from './draped';
 import type { PickRef } from './markerSpec';
 import { LocalFrame } from './path';
+import { NO_TUNNELS, type TunnelMask } from './tunnels';
 
 const WIDTH_PX = 7;
+const TUNNEL_WIDTH_PX = 3;
+/** Trafikverket's lines run a few metres beside OpenStreetMap's, and tunnels have one tube per direction. */
+const TUNNEL_TOLERANCE_M = 12;
 /** Each direction is drawn this far to its right, so both carriageways stay visible. */
 const OFFSET_M = 6;
 
@@ -62,20 +66,28 @@ export class TravelTimeLayer {
 
   constructor(private readonly scene: Scene) {}
 
-  set(layerId: string, channel: string, features: readonly Feature[]): void {
+  set(
+    layerId: string,
+    channel: string,
+    features: readonly Feature[],
+    tunnels: TunnelMask = NO_TUNNELS,
+  ): void {
     this.clear();
-    const byColor = new Map<string, DrapedLine[]>();
+    const byColor = new Map<string, { open: DrapedLine[]; tunnel: DrapedLine[] }>();
     for (const f of features) {
       if (f.kind !== 'travel-time') continue;
       const coords = decodeLine(f.line);
       if (coords.length < 2) continue;
       const color = travelTimeColor(f.props);
-      const lines = byColor.get(color) ?? [];
-      lines.push({
-        coords: offsetLine(coords, OFFSET_M),
-        width: WIDTH_PX,
-        id: { layerId, channel, ids: [f.id] } satisfies PickRef,
-      });
+      const lines = byColor.get(color) ?? { open: [], tunnel: [] };
+      const id = { layerId, channel, ids: [f.id] } satisfies PickRef;
+      const { surface, tunnel } = tunnels.split(coords, TUNNEL_TOLERANCE_M);
+      for (const part of surface) {
+        lines.open.push({ coords: offsetLine(part, OFFSET_M), width: WIDTH_PX, id });
+      }
+      for (const part of tunnel) {
+        lines.tunnel.push({ coords: offsetLine(part, OFFSET_M), width: TUNNEL_WIDTH_PX, id });
+      }
       byColor.set(color, lines);
     }
     for (const [color, lines] of byColor) {
@@ -84,8 +96,17 @@ export class TravelTimeLayer {
         outlineColor: Color.BLACK.withAlpha(0.7),
         outlineWidth: 2,
       });
-      const primitive = drapedMaterialLines(lines, material);
-      if (primitive) this.primitives.push(this.scene.primitives.add(primitive));
+      const tunnelMaterial = Material.fromType('PolylineDash', {
+        color: Color.fromCssColorString(color).withAlpha(0.55),
+        gapColor: Color.TRANSPARENT,
+        dashLength: 12,
+      });
+      for (const primitive of [
+        drapedMaterialLines(lines.open, material),
+        drapedMaterialLines(lines.tunnel, tunnelMaterial),
+      ]) {
+        if (primitive) this.primitives.push(this.scene.primitives.add(primitive));
+      }
     }
     this.scene.requestRender();
   }

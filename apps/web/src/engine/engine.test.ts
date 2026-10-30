@@ -4,6 +4,7 @@ import { ACCENT, MeshBuilder } from './gltf';
 import { LocalFrame, pointAlong, toPath } from './path';
 import { Playback } from './playback';
 import { carsAt, corridorFrom } from './traffic';
+import { NO_TUNNELS, portalFade, TunnelMask } from './tunnels';
 import { MODELS, shipModel, shipScale, type ModelKind } from './vehicleModels';
 import { flowPieces } from './waterways';
 
@@ -266,5 +267,60 @@ describe('traffic corridors', () => {
     expect(t0[0]!.heading).toBeCloseTo(90, 5);
     const ys = new Set(t0.map((car) => Math.round(frame.toXY(car.lon, car.lat)[1])));
     expect([...ys].sort()).toEqual([-2, 2]);
+  });
+
+  it('draws no cars inside a tunnel and fades them at the portals', () => {
+    const tunnel = new TunnelMask([
+      { ...feature({}, [frame.toLonLat(200, 0), frame.toLonLat(400, 0)]), kind: 'tunnel' },
+    ]);
+    const c = corridorFrom(feature({ flowVehH: 2400, speedKmh: 36, lanes: 1 }, line), tunnel)!;
+    expect(c.hidden).toHaveLength(1);
+    expect(Math.abs(c.hidden[0]![0] - 200)).toBeLessThanOrEqual(6);
+    expect(Math.abs(c.hidden[0]![1] - 400)).toBeLessThanOrEqual(6);
+    for (const t of [0, 7, 19]) {
+      for (const car of carsAt(c, t)) {
+        const [x] = frame.toXY(car.lon, car.lat);
+        if (x > 207 && x < 393) expect(car.scale).toBe(0);
+        if ((x > 30 && x < 165) || (x > 435 && x < 570)) expect(car.scale).toBe(1);
+      }
+    }
+  });
+});
+
+describe('tunnel mask', () => {
+  const frame = new LocalFrame(11.97, 57.7);
+  const at = (x: number, y: number) => frame.toLonLat(x, y);
+  const mask = new TunnelMask([
+    { ...feature({}, [at(0, 0), at(300, 0)]), kind: 'tunnel' },
+    { ...feature({}, [at(0, 500), at(300, 500)]), kind: 'waterway' },
+  ]);
+
+  it('covers points on a tunnel when moving along it, not across it', () => {
+    expect(mask.size).toBe(1);
+    expect(mask.covers(...at(150, 3), 90)).toBe(true);
+    expect(mask.covers(...at(150, 3), 270)).toBe(true);
+    expect(mask.covers(...at(150, 3))).toBe(true);
+    expect(mask.covers(...at(150, 3), 0)).toBe(false);
+    expect(mask.covers(...at(150, 20), 90)).toBe(false);
+    expect(mask.covers(...at(150, 500), 90)).toBe(false);
+    expect(NO_TUNNELS.covers(...at(150, 0))).toBe(false);
+  });
+
+  it('splits a road into its open and tunnel parts', () => {
+    const road = [at(-200, 4), at(500, 4)];
+    const { surface, tunnel } = mask.split(road, 6);
+    expect(tunnel).toHaveLength(1);
+    expect(surface).toHaveLength(2);
+    const xs = (part: readonly (readonly [number, number])[]) =>
+      part.map(([lon, lat]) => Math.round(frame.toXY(lon, lat)[0]));
+    expect(xs(tunnel[0]!)[0]).toBeCloseTo(0, -1);
+    expect(xs(tunnel[0]!).at(-1)).toBeCloseTo(300, -1);
+    expect(xs(surface[0]!)[0]).toBe(-200);
+    expect(xs(surface[1]!).at(-1)).toBe(500);
+    // A street crossing above the tunnel is not in it.
+    expect(mask.split([at(150, -200), at(150, 200)], 6).tunnel).toEqual([]);
+    expect(portalFade(100, [[200, 400]], 25)).toBe(1);
+    expect(portalFade(190, [[200, 400]], 25)).toBeCloseTo(0.4, 5);
+    expect(portalFade(300, [[200, 400]], 25)).toBe(0);
   });
 });

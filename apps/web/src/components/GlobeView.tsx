@@ -19,6 +19,7 @@ import { MarkerRenderer } from '../engine/markers';
 import { Overlay, type OverlayStats } from '../engine/overlay';
 import { RadarLayer, type RadarState } from '../engine/radar';
 import { NoiseLayer } from '../engine/noise';
+import type { TunnelMask } from '../engine/tunnels';
 import { SatelliteLayer } from '../engine/satellite';
 import { captureView } from '../engine/screenshot';
 import { Ground, TerrainController } from '../engine/terrain';
@@ -137,6 +138,8 @@ interface GlobeViewProps {
   satellite: boolean;
   /** The city's modelled road traffic noise over the basemap. */
   noise: boolean;
+  /** Roads and rails underground, so nothing is drawn moving through buildings or hills. */
+  tunnels: TunnelMask;
   /** Real terrain and 3D buildings from Cesium ion (needs `basemapKeys.cesiumIonToken`). */
   terrain: boolean;
   radar: RadarFrames | null;
@@ -193,9 +196,10 @@ export function GlobeView(props: GlobeViewProps) {
   const { ref, basemap, style, detection, density, tracked, markers, buildings, ride, drawing } =
     props;
   const waterwaysKey = featureKey(props.waterways);
-  const trafficKey = featureKey(props.traffic);
-  const travelTimesKey = featureKey(props.travelTimes);
-  const transitRoutesKey = `${featureKey(props.transitRoutes)}|${[...props.lineColors].sort().join()}`;
+  const tunnelsKey = props.tunnels.id;
+  const trafficKey = `${featureKey(props.traffic)}|${tunnelsKey}`;
+  const travelTimesKey = `${featureKey(props.travelTimes)}|${tunnelsKey}`;
+  const transitRoutesKey = `${featureKey(props.transitRoutes)}|${[...props.lineColors].sort().join()}|${tunnelsKey}`;
   const trailKey = props.trail
     ? `${props.trail.key}:${props.trail.points.length}:${props.trail.points.at(-1)?.[0] ?? 0}`
     : 'off';
@@ -427,7 +431,7 @@ export function GlobeView(props: GlobeViewProps) {
     const engine = engineRef.current;
     if (!engine) return;
     const set = latest.current.traffic;
-    if (set) engine.traffic.set(set.layerId, set.channel, set.features);
+    if (set) engine.traffic.set(set.layerId, set.channel, set.features, latest.current.tunnels);
     else engine.traffic.clear();
   }, [trafficKey]);
 
@@ -435,16 +439,27 @@ export function GlobeView(props: GlobeViewProps) {
     const engine = engineRef.current;
     if (!engine) return;
     const set = latest.current.travelTimes;
-    if (set) engine.travelTimes.set(set.layerId, set.channel, set.features);
-    else engine.travelTimes.clear();
+    if (set) {
+      engine.travelTimes.set(set.layerId, set.channel, set.features, latest.current.tunnels);
+    } else engine.travelTimes.clear();
   }, [travelTimesKey]);
+
+  useEffect(() => {
+    engineRef.current?.renderer.setTunnels(props.tunnels);
+  }, [props.tunnels]);
 
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine) return;
     const set = latest.current.transitRoutes;
     if (set) {
-      engine.transitRoutes.set(set.layerId, set.channel, set.features, latest.current.lineColors);
+      engine.transitRoutes.set(
+        set.layerId,
+        set.channel,
+        set.features,
+        latest.current.lineColors,
+        latest.current.tunnels,
+      );
     } else engine.transitRoutes.clear();
   }, [transitRoutesKey]);
 

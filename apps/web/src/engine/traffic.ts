@@ -4,6 +4,7 @@ import type { PickRef } from './markerSpec';
 import { ModelLayer, type ModelInstance } from './modelLayer';
 import { LocalFrame, pointAlong, toPath, type PathPoint } from './path';
 import type { Ground } from './terrain';
+import { NO_TUNNELS, portalFade, type Ranges, type TunnelMask } from './tunnels';
 
 const CAR_COLORS = [
   '#f2f2f0',
@@ -24,6 +25,8 @@ const MAX_CARS = 260;
 const MAX_PER_CORRIDOR = 40;
 const JAM_SPACING_M = 7.5;
 const FADE_M = 25;
+/** Corridors follow OpenStreetMap ways, so they lie right on the tunnel lines. */
+const TUNNEL_TOLERANCE_M = 5;
 
 interface Lane {
   offset: number;
@@ -38,6 +41,8 @@ export interface Corridor {
   speedMs: number;
   lanes: Lane[];
   center: Cartesian3;
+  /** Stretches (metres along the path) in tunnels, where no cars are drawn. */
+  hidden: Ranges;
 }
 
 function hash(text: string): number {
@@ -52,7 +57,10 @@ const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0
  * Lays out cars on a measured road stretch: density = flow / speed (vehicles per km), capped at
  * jam density, spread over the measured lanes. Starting positions are deterministic per corridor.
  */
-export function corridorFrom(feature: Feature): Corridor | undefined {
+export function corridorFrom(
+  feature: Feature,
+  tunnels: TunnelMask = NO_TUNNELS,
+): Corridor | undefined {
   const coords = decodeLine(feature.line);
   if (coords.length < 2) return undefined;
   const frame = new LocalFrame(coords[0]![0], coords[0]![1]);
@@ -90,6 +98,7 @@ export function corridorFrom(feature: Feature): Corridor | undefined {
     speedMs: speedKmh / 3.6,
     lanes,
     center: Cartesian3.fromDegrees(lon, lat),
+    hidden: tunnels.ranges(coords, TUNNEL_TOLERANCE_M),
   };
 }
 
@@ -107,7 +116,7 @@ export function carsAt(c: Corridor, t: number) {
       const y = p.y - Math.sin(rad) * lane.offset;
       const [lon, lat] = c.frame.toLonLat(x, y);
       const edge = Math.min(s, c.length - s);
-      const scale = Math.min(1, Math.max(0, edge / FADE_M));
+      const scale = Math.min(1, Math.max(0, edge / FADE_M), portalFade(s, c.hidden, FADE_M));
       cars.push({ lon, lat, heading, scale, index: index++ });
     }
   }
@@ -131,10 +140,15 @@ export class TrafficLayer {
     this.models = new ModelLayer(scene);
   }
 
-  set(layerId: string, channel: string, features: readonly Feature[]): void {
+  set(
+    layerId: string,
+    channel: string,
+    features: readonly Feature[],
+    tunnels: TunnelMask = NO_TUNNELS,
+  ): void {
     this.layerId = layerId;
     this.channel = channel;
-    this.corridors = features.flatMap((f) => corridorFrom(f) ?? []);
+    this.corridors = features.flatMap((f) => corridorFrom(f, tunnels) ?? []);
   }
 
   /** Moves the cars; returns true while any are on screen. */

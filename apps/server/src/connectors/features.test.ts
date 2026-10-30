@@ -1,6 +1,6 @@
 import { decodeLine, FeatureSchema, type LonLat } from '@gbg-osint/shared';
 import { describe, expect, it } from 'vitest';
-import { parseWaterways } from './osm';
+import { parseTunnels, parseWaterways } from './osm';
 import { buildTrafficCorridors, onewayOf, sideBearing, type RoadWay } from './roadFlow';
 import { corridorFeatures, parseFlowRecords, parseRoads } from './trafikverket';
 import { fromLocalM, lineLengthM, simplifyLine, toLocalM } from './util';
@@ -73,6 +73,43 @@ describe('parseWaterways', () => {
     const line = decodeLine(river!.line);
     expect(lineLengthM(line)).toBeCloseTo(400, -1);
     expect(line[0]![0]).toBeLessThan(line.at(-1)![0]);
+  });
+});
+
+describe('parseTunnels', () => {
+  const geometry = (pts: LonLat[]) => pts.map(([lon, lat]) => ({ lon, lat }));
+
+  it('keeps road and rail tunnels and covered roads, named after the tunnel', () => {
+    const way = (id: number, tags: Record<string, string>) => ({
+      type: 'way',
+      id,
+      tags,
+      geometry: geometry(eastward([0, id * 100], 3, 50)),
+    });
+    const features = parseTunnels(
+      {
+        elements: [
+          way(1, { highway: 'trunk', tunnel: 'yes', name: 'Götatunneln', ref: 'E 45' }),
+          way(2, { highway: 'service', tunnel: 'building_passage' }),
+          way(3, { highway: 'secondary', covered: 'yes' }),
+          way(4, { railway: 'rail', tunnel: 'yes', 'tunnel:name': 'Gamlestadstunneln' }),
+          way(5, { highway: 'primary', tunnel: 'no' }),
+          way(6, { highway: 'primary', bridge: 'yes' }),
+          way(7, { waterway: 'stream', tunnel: 'culvert' }),
+        ],
+      },
+      Date.parse('2026-10-30T12:00:00Z'),
+    );
+    expect(features.map((f) => [f.id, f.label, f.props?.mode])).toEqual([
+      ['way/1', 'Götatunneln', 'road'],
+      ['way/2', undefined, 'road'],
+      ['way/3', undefined, 'road'],
+      ['way/4', 'Gamlestadstunneln', 'rail'],
+    ]);
+    for (const f of features) {
+      expect(FeatureSchema.safeParse(f).success).toBe(true);
+      expect(lineLengthM(decodeLine(f.line))).toBeCloseTo(150, -1);
+    }
   });
 });
 

@@ -40,6 +40,7 @@ export function isReplayable(channel: string, kind: ChannelKind | undefined): bo
 export const STATIC_CHANNELS: ReadonlySet<string> = new Set([
   'context.districts',
   'context.poi',
+  'context.tunnels',
   'transit.routes',
   'transit.stops',
   'env.waterways',

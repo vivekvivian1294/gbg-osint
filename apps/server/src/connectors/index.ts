@@ -20,7 +20,7 @@ import { metNowcast, metOceanForecast, vivaHarbour } from './harbour';
 import { krisinformation } from './krisinformation';
 import { styrOchStall } from './nextbike';
 import { openMeteoWind } from './openMeteo';
-import { osmPois, osmWaterways } from './osm';
+import { osmPois, osmTunnels, osmWaterways } from './osm';
 import { polisenEvents } from './polisen';
 import { radioStations } from './radio';
 import { trafikverketRailEvents, trafikverketTrainPositions } from './rail';
@@ -101,4 +101,5 @@ export const connectors: readonly Connector[] = [
   goteborgStreetWorks,
   goteborgNoise,
   metOceanForecast,
+  osmTunnels,
 ];

@@ -14,7 +14,7 @@ It is a **research tool you run on your own computer**, not a hosted website. Yo
 
 ## What's on the map
 
-The server runs 52 connectors, one per data source. Most need no key; the last column says which themes do.
+The server runs 53 connectors, one per data source. Most need no key; the last column says which themes do.
 
 | Theme            | What you see                                                                                                                                                                                | From                                                                           | Key                                         |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------- |
@@ -272,7 +272,7 @@ Settings go in `.env` with the keys (see `.env.example`). All are optional.
 ## Responsible use
 
 - **No people tracking.** The tool shows vehicles, events, infrastructure and systems. It has no person search, no face recognition and no profiling. Camera and street-level images are only displayed.
-- **Estimates are labelled.** Vehicle motion between updates, camera viewsheds and approximate event locations are modelled, and the app marks them as such. Police events are only located to the municipality.
+- **Estimates are labelled.** Vehicle motion between updates, camera viewsheds and approximate event locations are modelled, and the app marks them as such. Police events are only located to the municipality. Where roads and railways run in tunnels (from OpenStreetMap), lines are dashed and vehicles are shown as icons rather than 3D models.
 - **Respect the sources.** Every source is credited in the app. Their terms of use and rate limits apply to you when you run the tool; please don't remove the throttling or point heavy automated use at community services (OSRM, Photon, OpenFreeMap). Setting `UPSTREAM_USER_AGENT` to include your e-mail is good practice.
 - **Keep it local.** The server listens on `127.0.0.1` only. Don't expose it to the internet.
 
