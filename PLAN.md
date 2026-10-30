@@ -350,7 +350,7 @@ Key column: **None** = open, **Free** = free registration or key, **Paid** = pai
 - **Missions (`M`):** City pulse, Sky watch, Approach GOT, Storm watch, Harbour watch. Shown on the first visit.
 - **Also:** SMHI 12-hour forecast summary (snow1g API; pmp3g is retired) and a keyboard shortcuts dialog (`?`).
 
-### Phase 3 – Keyed city sources ✅ done (core)
+### Phase 3 – Keyed city sources ✅ done
 - **Västtrafik:** live trams, buses and ferries every 15 s, coloured by line. The bounding box is split into quadrants because each request returns at most 200 vehicles. Departure boards for six hubs.
 - **Trafikverket:** road incidents and roadworks (polled every 60 s), about 270 road cameras with live photos in the details card, trains at Göteborg C, and road weather stations.
 - **Göteborgs Stad:** city traffic impact and roadworks, Göta älv and lake levels, and air quality with an indicative AQI.
